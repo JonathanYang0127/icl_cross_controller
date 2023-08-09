@@ -1,0 +1,14 @@
+lr:
+lr_backbone: 1e-5
+backbone: resnet18
+num_queries: 1
+kl_weight:
+hidden_dim: False
+dim_feedforward:
+enc_layers:
+dec_layers:
+nheads:
+camera_names:
+state_dim:
+                
+
