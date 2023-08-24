@@ -206,9 +206,9 @@ class CNN(nn.Module):
 
         if self.output_conv_channels:
             return h
-        
+       
         # flatten channels for fc layers
-        h = h.view(h.size(0), -1)
+        h = h.flatten(1, 3)
         if self.added_fc_input_size != 0:
             h = torch.cat((extra_fc_input, h), dim=+1)
         h = self.apply_forward_fc(h, intermediate_output_layer)
@@ -308,11 +308,12 @@ class GaussianCNNPolicy(CNN):
             self.log_std = np.log(std)
             assert LOG_SIG_MIN <= self.log_std <= LOG_SIG_MAX
 
-    def forward(self, obs, intermediate_output_layer=-1):
+    def forward(self, obs, extra_fc_input=None, intermediate_output_layer=-1):
         if intermediate_output_layer == -1:
-            h = super().forward(obs, return_last_activations=True)
+            h = super().forward(obs, extra_fc_input=extra_fc_input, return_last_activations=True)
         else:
             h, intermediate_output = super().forward(obs, return_last_activations=True, 
+                extra_fc_input=extra_fc_input,
                 intermediate_output_layer=intermediate_output_layer)
         preactivation = self.last_fc(h)
         mean = self.output_activation(preactivation)
@@ -340,34 +341,41 @@ class GCConvPolicy(GaussianCNNPolicy, BaseTorchPolicy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lr = kwargs['lr']
+        self.no_goal = kwargs.get('no_goal', False)
+    
         self.optimizer = torch.optim.Adam(
             self.parameters(),
             lr=self.lr
         )
 
-    def forward_np(self, image, goal_image):
+    def forward_np(self, image, goal_image, task_embedding=None):
         '''
         Image is (batch, height, width, channels)
         Data type is uint8 and normalized
         '''
         image = image.astype(np.float32) / 255.0
-        goal_image = goal_image.astype(np.float32) / 255.0
-        curr_image = torch.from_numpy(image).cuda()
-        goal_image = torch.from_numpy(goal_image).cuda()
+        image = torch.from_numpy(image).cuda()
+        if task_embedding is not None:
+            task_embedding = torch.from_numpy(task_embedding)
+       
+        if not self.no_goal: 
+            goal_image = goal_image.astype(np.float32) / 255.0
+            goal_image = torch.from_numpy(goal_image).cuda()
+            image_data = torch.stack([image, goal_image], dim=1)      #b, 2, h, w, c
+            image_data = torch.einsum('b k h w c -> b k c h w', image_data)
+            image_data = image_data.flatten(1, 2) # b k c h w -> b (k c) h w
+        else:
+            image_data = torch.einsum('b h w c -> b c h w', image)
 
-        image_data = torch.stack([curr_image, goal_image], dim=1)      #b, 2, h, w, c
-        image_data = torch.einsum('b k h w c -> b k c h w', image_data)
-        image_data = image_data.flatten(1, 2) # b k c h w -> b (k c) h w
- 
-        return super().forward(image_data)
+        return super().forward(image_data, extra_fc_input=task_embedding)
 
-    def get_action(self, image, goal_image):
-        dist = self.forward_np(image, goal_image)
-        action = dist.sample()
-        return action.detach().numpy()
+    def get_action(self, image, goal_image, task_embedding=None):
+        dist = self.forward_np(image, goal_image, task_embedding)
+        action = dist.mean
+        return action.detach().cpu().numpy()
 
-    def compute_loss_np(self, image, goal_image, actions):
-        dist = self.forward_np(image, goal_image)
+    def compute_loss_np(self, image, goal_image, actions, task_embedding=None):
+        dist = self.forward_np(image, goal_image, task_embedding)
         actions = torch.from_numpy(actions).cuda()
 
         policy_logpp = dist.log_prob(actions, )

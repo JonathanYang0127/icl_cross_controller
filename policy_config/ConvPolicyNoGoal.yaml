@@ -1,0 +1,27 @@
+
+max_log_std: 0
+min_log_std: -6
+obs_dim: null
+action_dim: 7
+std_architecture: values
+
+input_width: 64
+input_height: 64
+input_channels: 3
+kernel_sizes: [3, 3, 3]
+n_channels: [16, 16, 16]
+strides: [1, 1, 1]
+hidden_sizes: [256, 256, 256]
+paddings: [1, 1, 1]
+pool_type: "max2d"
+pool_sizes: [2, 2, 1]
+pool_strides: [2, 2, 1]
+pool_paddings: [0, 0, 0]
+image_augmentation: True
+image_augmentation_padding: 4
+
+lr: 0.0003
+batch_size: 256
+
+no_goal: True
+
