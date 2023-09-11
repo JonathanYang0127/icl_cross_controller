@@ -1,0 +1,7 @@
+*.pyc
+*.nfs*
+*.swp
+checkpoints
+scripts/checkpoints
+scripts/wandb
+scripts/videos

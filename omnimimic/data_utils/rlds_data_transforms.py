@@ -71,9 +71,31 @@ def polybot_dataset_transform_nodecode(
     return trajectory
 
 
+def bridge_dataset_transform_nodecode(
+    trajectory: Dict[str, Any]
+) -> Dict[str, Any]:
+    #set image as wrist image
+    trajectory["observation"]["image"] = trajectory["observation"]["image_3"][:,::4,::4,:]
+
+    #Relabel random goals
+    batch_size = len(trajectory["action"])
+    rand = tf.random.uniform(shape=[batch_size])
+    low = tf.cast(tf.range(batch_size), dtype=tf.float32)
+    high = tf.ones_like(low) * tf.cast(batch_size, dtype=tf.float32)
+    goal_idxs = tf.cast((high-low) * rand + low, dtype=tf.int32)
+    goal_idxs = tf.minimum(goal_idxs, batch_size - 1)
+
+    trajectory["goal_image"] = tf.nest.map_structure(
+        lambda x: tf.gather(x, goal_idxs),
+        trajectory["observation"]["image"]
+    )
+    return trajectory
+
+
 
 RLDS_TRANSFORM_DICT = {
     'gnm_dataset': gnm_dataset_transform_nodecode,
-    'polybot_dataset': polybot_dataset_transform_nodecode
+    'polybot_dataset': polybot_dataset_transform_nodecode,
+    'bridge_dataset': bridge_dataset_transform_nodecode
 }
 

@@ -17,7 +17,7 @@ import time
 from typing import Any, Dict
 from functools import partial
 
-from omnimimic.policies import GCConvPolicy, ACTPolicy
+from omnimimic.policies import GCConvPolicy, ACTPolicy, GNMPolicy
 from omnimimic.data_utils.rlds_data_transforms import RLDS_TRANSFORM_DICT
 
 import wandb
@@ -46,7 +46,7 @@ def decode_trajectory(builder, episode: Dict[str, Any]) -> Dict[str, Any]:
                     ].decode_batch_example(steps[key]) 
     return steps
 
-def make_dataloader(dataset_name, split, batch_size, data_dir=None):
+def make_dataloader(dataset_name, split, batch_size, data_dir=None, shuffle_size=10000):
     builder = tfds.builder(dataset_name, data_dir=data_dir)
     dataset = builder.as_dataset(
             split=split,
@@ -56,11 +56,14 @@ def make_dataloader(dataset_name, split, batch_size, data_dir=None):
 
     dataloader = dataset.map(partial(decode_trajectory, builder),
         num_parallel_calls=tf.data.AUTOTUNE)
+    if dataset_name == 'bridge_dataset':
+        dataloader = dataloader.filter(lambda e: 
+            tf.math.reduce_mean(e['observation']['image_3'][0]) > 0)
     if dataset_name in RLDS_TRANSFORM_DICT.keys():
         dataloader = dataloader.map(RLDS_TRANSFORM_DICT[dataset_name])
     dataloader = dataloader.flat_map(lambda e: tf.data.Dataset.from_tensor_slices(e))
 
-    dataloader = dataloader.repeat(1).shuffle(20000, reshuffle_each_iteration=True)
+    dataloader = dataloader.repeat(1).shuffle(shuffle_size, reshuffle_each_iteration=True)
     dataloader = dataloader.batch(batch_size)
     dataloader = tfds.as_numpy(dataloader)
     return dataloader
@@ -86,19 +89,28 @@ def main(args):
     policy = make_policy(policy_class, policy_config)
     batch_size_train = policy_config['batch_size']
     batch_size_val = policy_config['batch_size']
+    print(batch_size_train)
     lr = policy_config['lr']
 
     #Define Dataloaders
     TFDS_DATA_DIR = '/iris/u/jyang27/rlds_data'
     train_dataloader = make_dataloader(dataset, 'train', 
         batch_size_train//2, data_dir=TFDS_DATA_DIR)
+    train_dataloaders = [train_dataloader]
 
     val_dataloader = make_dataloader(dataset, 'train[75%:]',
         batch_size_train, data_dir=TFDS_DATA_DIR)
+   
+    if args['use_gnm']:
+        gnm_dataloader = make_dataloader('gnm_dataset', 'train',
+            batch_size_train//2, data_dir=TFDS_DATA_DIR)
+        train_dataloaders.append(gnm_dataloader)
+    if args['use_bridge']:
+        bridge_dataloader = make_dataloader('bridge_dataset', 'train',
+            batch_size_train//2, data_dir=TFDS_DATA_DIR,
+            shuffle_size=5000)
+        train_dataloaders.append(bridge_dataloader)
     
-    gnm_dataloader = make_dataloader('gnm_dataset', 'train',
-        batch_size_train//2, data_dir=TFDS_DATA_DIR)
-
     #Define Train Config
     train_config = {
         'num_epochs': num_epochs,
@@ -116,7 +128,7 @@ def main(args):
         #'camera_names': camera_names,
         #'real_robot': not is_sim
     }
-    train_bc(train_dataloader, val_dataloader, gnm_dataloader, train_config, logger)
+    train_bc(train_dataloaders, val_dataloader, train_config, logger)
 
 def compute_dict_mean(epoch_dicts):
     result = {k: None for k in epoch_dicts[0]}
@@ -134,7 +146,7 @@ def detach_dict(d):
         new_d[k] = v.detach()
     return new_d
 
-def train_bc(train_dataloader, val_dataloader, gnm_dataloader, train_config, logger):
+def train_bc(train_dataloaders, val_dataloader, train_config, logger):
     num_epochs = train_config['num_epochs']
     ckpt_dir = train_config['ckpt_dir']
     exp_name = train_config['exp_name']
@@ -145,26 +157,29 @@ def train_bc(train_dataloader, val_dataloader, gnm_dataloader, train_config, log
     policy.cuda()
     policy.train() 
  
-    optimizer = make_optimizer(policy_class, policy)
+    optimizer, scheduler = make_optimizer(policy_class, policy)
 
     for epoch in tqdm(range(num_epochs)):
         #gnm_itr = gnm_dataloader.as_numpy_iterator()
         optimizer.zero_grad()
         train_epoch_dicts = []
 
-        for batch_idx, (data, batch) in enumerate(zip(train_dataloader, gnm_dataloader)):
+        for batch_idx, data in enumerate(zip(*train_dataloaders)):
             # batch = next(gnm_itr)
-            obs = np.concatenate((batch['observation']['image'], data['observation']['image']), axis=0)
-            goal_image = np.concatenate((batch['goal_image'], data['goal_image']), axis=0)
-            action = np.concatenate((batch['action'], data['action']), axis=0)
-            task_embedding = np.concatenate((np.zeros((len(batch['action']), data['task_embedding'].shape[1])), data['task_embedding']), axis=0)
+            obs = np.concatenate([batch['observation']['image'] for batch in data], axis=0)
+            goal_image = np.concatenate([batch['goal_image'] for batch in data], axis=0)
+            action = np.concatenate([batch['action'] for batch in data], axis=0)
+            #task_embedding = np.concatenate((batch['task_embedding'] for batch in data), axis=0)
             #loss_dict = policy.compute_loss_np(data['observation']['image'], 
             #        data['observation']['goal_image'], data['action'], data['task_embedding'])
-            loss_dict = policy.compute_loss_np(obs, goal_image, action, task_embedding)
+            loss_dict = policy.compute_loss_np(obs, goal_image, action, task_embedding=None)
             loss = loss_dict['loss']
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
+
+            if scheduler is not None:
+                scheduler.step()
 
             train_epoch_dicts.append(detach_dict(loss_dict))
 
@@ -194,9 +209,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--policy-class', type=str, required=True)
     parser.add_argument('--policy-config', type=str, required=True)
-    parser.add_argument('--num-epochs',  type=int, default=1000)
+    parser.add_argument('--num-epochs',  type=int, default=2000)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--dataset', type=str, required=True)
+    parser.add_argument('--use-gnm', action='store_true', default=False)
+    parser.add_argument('--use-bridge', action='store_true', default=False)
     args = parser.parse_args()
    
     main(vars(args))

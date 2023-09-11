@@ -384,7 +384,7 @@ class GCConvPolicy(GaussianCNNPolicy, BaseTorchPolicy):
         return {'loss': policy_loss}
 
     def configure_optimizers(self):
-        return self.optimizer
+        return self.optimizer, None
 
 class RandomCrop:
     """
