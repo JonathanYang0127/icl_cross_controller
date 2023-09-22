@@ -221,11 +221,9 @@ def compute_deconv_layer_sizes(h_in, w_in, kernel_sizes, strides,
 """
 GPU wrappers
 """
-
 _use_gpu = False
-_gpu_ids = [0]
 device = None
-
+_gpu_ids = []
 
 def set_gpu_mode(mode, gpu_ids=[0]):
     global _use_gpu

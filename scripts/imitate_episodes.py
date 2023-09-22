@@ -20,7 +20,7 @@ from functools import partial
 
 from omnimimic.policies import GCConvPolicy, ACTPolicy, GNMPolicy
 from omnimimic.data_utils.rlds_data_transforms import RLDS_TRANSFORM_DICT
-from omnimimic.torch.pytorch_util import device, set_gpu_mode
+import omnimimic.torch.pytorch_util as ptu
 
 from prettytable import PrettyTable
 import wandb
@@ -100,7 +100,7 @@ def main(args):
     with open(policy_config_path, 'rb') as f:
         policy_config = yaml.safe_load(f)
     policy = make_policy(policy_class, policy_config)
-    policy.to(device)
+    policy.to(ptu.device)
     if len(gpu_ids) > 1:
         policy = torch.nn.DataParallel(policy, device_ids=gpu_ids)
 
@@ -156,7 +156,7 @@ def main(args):
     }
 
     #Set up logger
-    run_name = 'omnimimic_train-'
+    run_name = f'omnimimic_train-{policy_class}-'
     run_name = run_name + '_'.join(datasets)
     logger = wandb.init(
         name=run_name,
@@ -268,9 +268,8 @@ if __name__ == '__main__':
     parser.add_argument('--val-datasets', type=str, nargs='+', default=[])
     parser.add_argument('--gpu-ids', type=str, nargs='+', default=[0])
     args = parser.parse_args()
-   
-    main(vars(args))
-
+  
     print("Num GPUs: {}", torch.cuda.device_count())
-    #torch.cuda.set_device(True, gpu_id=0)
-    set_gpu_mode(True, gpu_ids=args['gpu_ids'])
+    ptu.set_gpu_mode(True, gpu_ids=args.gpu_ids)
+
+    main(vars(args))

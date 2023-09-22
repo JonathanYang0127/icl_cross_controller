@@ -156,7 +156,6 @@ class GNMPolicy(GaussianGNMPolicy):
     def compute_loss_np(self, image, goal_image, actions, task_embedding=None):
         dist = self.forward_np(image, goal_image, task_embedding)
         actions = torch.from_numpy(actions).to(ptu.device)
-
         policy_logpp = dist.log_prob(actions, )
         policy_loss = -policy_logpp.mean()
 
