@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --partition=iris
+#SBATCH --partition=iris-hi
 #SBATCH --time=5-00:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100G
@@ -14,8 +14,7 @@ conda deactivate
 conda activate navigation_env
 
 cd /iris/u/jyang27/dev/omnimimic/scripts
-python imitate_episodes.py --policy-class ConvNet --policy-config ../policy_config/ConvPolicy.yaml --dataset polybot_dataset --seed 0
-
+python imitate_episodes.py --policy-class GNM --policy-config ../policy_config/gnmv9_policy.yaml --dataset polybot_dataset gnm_dataset --val-dataset polybot_dataset gnm_dataset --seed 20
 
 
 #done

@@ -223,16 +223,18 @@ GPU wrappers
 """
 
 _use_gpu = False
+_gpu_ids = [0]
 device = None
 
 
-def set_gpu_mode(mode, gpu_id=0):
+def set_gpu_mode(mode, gpu_ids=[0]):
     global _use_gpu
     global device
     global _gpu_id
-    _gpu_id = gpu_id
+    _gpu_ids = gpu_ids
     _use_gpu = mode
-    device = torch.device("cuda:" + str(gpu_id) if _use_gpu else "cpu")
+    device = torch.device("cuda:" + ",".join([str(x) 
+        for x in gpu_ids]) if _use_gpu else "cpu")
 
 
 def gpu_enabled():

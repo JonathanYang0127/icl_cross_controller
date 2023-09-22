@@ -4,18 +4,18 @@ run_name: base-vint-4x4-0c
 # training setup
 use_wandb: True # set to false if you don't want to log to wandb
 train: True
-batch_size: 4
-epochs: 100
+batch_size: 256
+epochs: 50
 gpu_ids: [5, 6, 7]
 num_workers: 12
-lr: 5e-4
+lr: 3e-4
 optimizer: adamw
 clipping: False
 max_norm: 1.
-scheduler: "cosine"
+scheduler: null#"cosinewarm"
 warmup: True # True
-warmup_epochs: 4
-cyclic_period: 10
+warmup_epochs: 50
+cyclic_period: 50
 plateau_patience: 3
 plateau_factor: 0.5
 seed: 0
@@ -63,7 +63,7 @@ len_traj_pred: 1
 learn_angle: True
 
 # dataset specific parameters
-image_size: [128, 128] # width, height
+image_size: [64, 64] # width, height
 datasets:
   recon:
     data_folder: /raid/ajaysridhar/gnm_dataset/recon

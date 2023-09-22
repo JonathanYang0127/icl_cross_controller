@@ -6,7 +6,9 @@ from efficientnet_pytorch import EfficientNet
 import vc_models
 from .base_model import BaseModel
 from .self_attention import MultiLayerDecoder
+from omnimimic.policies.convnet_policy import CNN
 import pdb
+import yaml
 
 class GNM_V9_SA(BaseModel):
     def __init__(
@@ -44,6 +46,13 @@ class GNM_V9_SA(BaseModel):
         self.goal_encoder = EfficientNet.from_name("efficientnet-b0", in_channels=6) # obs+goal
         self.num_goal_features = self.goal_encoder._fc.in_features
 
+        #with open('/iris/u/jyang27/dev/omnimimic/policy_config/ConvGNMTest.yaml', 'r') as f:
+        #    params = yaml.safe_load(f)
+        #self.goal_encoder = CNN(**params)
+        #self.goal_encoder.extract_features = self.goal_encoder.forward
+        #self.num_goal_features = 64
+        self.goal_encoder_params = nn.ParameterList(list(self.goal_encoder.parameters()))
+
         if self.num_obs_features != self.obs_encoding_size:
             self.compress_obs_enc = nn.Linear(self.num_obs_features, self.obs_encoding_size)
         else:
@@ -57,20 +66,21 @@ class GNM_V9_SA(BaseModel):
         self.decoder = MultiLayerDecoder(
             embed_dim=self.obs_encoding_size,
             seq_len=self.context_size+2,
-            output_layers=[256, 128, 64, 32],
+            output_layers=[256, 128, 64],
             nhead=mha_num_attention_heads,
             num_layers=mha_num_attention_layers,
             ff_dim_factor=mha_ff_dim_factor,
         )
         self.dist_predictor = nn.Sequential(
-            nn.Linear(32, 1),
+            nn.Linear(64, 1),
         )
         self.action_predictor = nn.Sequential(
-            nn.Linear(32, self.len_trajectory_pred * self.num_action_params),
+            nn.Linear(64, self.len_trajectory_pred * self.num_action_params),
         )
+        self.test_predictor = nn.Linear(512, 64)
 
     def forward(
-        self, obs_img: torch.tensor, goal_img: torch.tensor,
+        self, obs_img: torch.tensor, goal_img: torch.tensor, return_final_repr:bool
     ) -> Tuple[torch.Tensor, torch.Tensor]:
 
         # if self.goal_encoder is None:
@@ -79,7 +89,7 @@ class GNM_V9_SA(BaseModel):
         # else:
         # concat obs and goal image
 
-        ### OBS_GOAL ENCODING STUFF ###
+        ### OBS_GOAL ENCODING STUFF ##
         obsgoal_img = torch.cat([obs_img[:, 3*self.context_size:, :, :], goal_img], dim=1)
         obsgoal_embedding = self.goal_encoder.extract_features(obsgoal_img)
         obsgoal_embedding = self.goal_encoder._avg_pooling(obsgoal_embedding)
@@ -121,7 +131,10 @@ class GNM_V9_SA(BaseModel):
         # # concatenate the goal embedding to the observation encoding
         obs_encoding = torch.cat((obs_encoding, obsgoal_embedding), dim=1)
         final_repr = self.decoder(obs_encoding)
-        # currently, the size is [batch_size, 32]
+        # currently, the size is [batch_size, 64]
+
+        if return_final_repr:
+            return final_repr
 
         dist_pred = self.dist_predictor(final_repr)
         action_pred = self.action_predictor(final_repr)
@@ -130,6 +143,8 @@ class GNM_V9_SA(BaseModel):
         action_pred = action_pred.reshape(
             (action_pred.shape[0], self.len_trajectory_pred, self.num_action_params)
         )
+
+        '''
         action_pred[:, :, :2] = torch.cumsum(
             action_pred[:, :, :2], dim=1
         )  # convert position deltas into waypoints
@@ -137,6 +152,7 @@ class GNM_V9_SA(BaseModel):
             action_pred[:, :, 2:] = F.normalize(
                 action_pred[:, :, 2:].clone(), dim=-1
             )  # normalize the angle prediction
+        '''
         return dist_pred, action_pred
 
     

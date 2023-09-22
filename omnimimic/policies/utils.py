@@ -1,4 +1,5 @@
 import torch
+import omnimimic.torch.pytorch_util as ptu
 from torchvision.transforms import ColorJitter
 
 def get_augmentation_transforms(augmentation_types, augmentation_config):
@@ -9,7 +10,7 @@ def get_augmentation_transforms(augmentation_types, augmentation_config):
         if augmentation_type == 'random_crop':
             #padding = augmentation_config['random_crop_padding']
             transforms.append(RandomCrop(
-                input_dim, input_dim//16, device='cuda'))
+                input_dim, input_dim//16))
         elif augmentation_type == 'warp_perspective':
             transforms.append(WarpPerspective(
                 input_dim))
@@ -38,11 +39,10 @@ class RandomCrop:
         device (torch.device,optional): The device of tensors to which the transform will be applied.
     """
 
-    def __init__(self, size, padding=None, dtype=torch.float, device='cpu'):
+    def __init__(self, size, padding=None, dtype=torch.float):
         self.size = size
         self.padding = padding
         self.dtype = dtype
-        self.device = device
 
     def __call__(self, tensor):
         """
@@ -55,7 +55,7 @@ class RandomCrop:
             padded = torch.zeros((tensor.size(0), tensor.size(1),
                                   tensor.size(2) + self.padding * 2,
                                   tensor.size(3) + self.padding * 2),
-                                 dtype=self.dtype, device=self.device)
+                                 dtype=self.dtype, device=ptu.device)
             padded[:, :, self.padding:-self.padding,
             self.padding:-self.padding] = tensor
         else:
@@ -67,13 +67,13 @@ class RandomCrop:
             i, j = 0, 0
         else:
             i = torch.randint(0, h - th + 1, (tensor.size(0),),
-                              device=self.device)
+                              device=ptu.device)
             j = torch.randint(0, w - tw + 1, (tensor.size(0),),
-                              device=self.device)
+                              device=ptu.device)
 
-        rows = torch.arange(th, dtype=torch.long, device=self.device) + i[:,
+        rows = torch.arange(th, dtype=torch.long, device=ptu.device) + i[:,
                                                                         None]
-        columns = torch.arange(tw, dtype=torch.long, device=self.device) + j[:,
+        columns = torch.arange(tw, dtype=torch.long, device=ptu.device) + j[:,
                                                                            None]
         padded = padded.permute(1, 0, 2, 3)
         padded = padded[:, torch.arange(tensor.size(0))[:, None, None],

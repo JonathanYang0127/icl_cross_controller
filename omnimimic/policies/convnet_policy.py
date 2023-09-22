@@ -148,7 +148,7 @@ class CNN(nn.Module):
         if self.image_augmentation:
             if self.augmentation_type == 'random_crop':
                 self.augmentation_transform = RandomCrop(
-                    input_height, self.image_augmentation_padding, device='cuda')
+                    input_height, self.image_augmentation_padding, device=ptu.device)
             elif self.augmentation_type == 'warp_perspective':
                 self.augmentation_transform = WarpPerspective(
                     input_height)
@@ -354,13 +354,13 @@ class GCConvPolicy(GaussianCNNPolicy, BaseTorchPolicy):
         Data type is uint8 and normalized
         '''
         image = image.astype(np.float32) / 255.0
-        image = torch.from_numpy(image).cuda()
+        image = torch.from_numpy(image).to(ptu.device)
         if task_embedding is not None:
             task_embedding = torch.from_numpy(task_embedding)
        
         if not self.no_goal: 
             goal_image = goal_image.astype(np.float32) / 255.0
-            goal_image = torch.from_numpy(goal_image).cuda()
+            goal_image = torch.from_numpy(goal_image).to(ptu.device)
             image_data = torch.stack([image, goal_image], dim=1)      #b, 2, h, w, c
             image_data = torch.einsum('b k h w c -> b k c h w', image_data)
             image_data = image_data.flatten(1, 2) # b k c h w -> b (k c) h w
@@ -376,12 +376,15 @@ class GCConvPolicy(GaussianCNNPolicy, BaseTorchPolicy):
 
     def compute_loss_np(self, image, goal_image, actions, task_embedding=None):
         dist = self.forward_np(image, goal_image, task_embedding)
-        actions = torch.from_numpy(actions).cuda()
+        actions = torch.from_numpy(actions).to(ptu.device)
 
         policy_logpp = dist.log_prob(actions, )
         policy_loss = -policy_logpp.mean()
 
-        return {'loss': policy_loss}
+        action_pred = dist.mean 
+        mse_loss = F.mse_loss(action_pred.float(), actions.float(), reduction="none").mean()
+
+        return {'loss': policy_loss, 'mse_loss': mse_loss}
 
     def configure_optimizers(self):
         return self.optimizer, None
@@ -416,7 +419,7 @@ class RandomCrop:
             padded = torch.zeros((tensor.size(0), tensor.size(1),
                                   tensor.size(2) + self.padding * 2,
                                   tensor.size(3) + self.padding * 2),
-                                 dtype=self.dtype, device=self.device)
+                                 dtype=self.dtype, device=ptu.device)
             padded[:, :, self.padding:-self.padding,
             self.padding:-self.padding] = tensor
         else:
@@ -428,13 +431,13 @@ class RandomCrop:
             i, j = 0, 0
         else:
             i = torch.randint(0, h - th + 1, (tensor.size(0),),
-                              device=self.device)
+                              device=ptu.device)
             j = torch.randint(0, w - tw + 1, (tensor.size(0),),
-                              device=self.device)
+                              device=ptu.device)
 
-        rows = torch.arange(th, dtype=torch.long, device=self.device) + i[:,
+        rows = torch.arange(th, dtype=torch.long, device=ptu.device) + i[:,
                                                                         None]
-        columns = torch.arange(tw, dtype=torch.long, device=self.device) + j[:,
+        columns = torch.arange(tw, dtype=torch.long, device=ptu.device) + j[:,
                                                                            None]
         padded = padded.permute(1, 0, 2, 3)
         padded = padded[:, torch.arange(tensor.size(0))[:, None, None],

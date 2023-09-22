@@ -39,15 +39,6 @@ class max_q_policy:
         self.qf1.eval()
         self.policy.eval()
 
-def make_policy(policy_class, policy_config):
-    if policy_class == 'ACT':
-        policy = ACTPolicy(**policy_config)
-    elif policy_class == 'ConvNet':
-        policy = GCConvPolicy(**policy_config)
-    elif policy_class == 'GNM':
-        policy = GNMPolicy(**policy_config)
-    return policy
-
 def process_image(image, downsample=False):
     ''' ObsDictReplayBuffer wants flattened (channel, height, width) images float32'''
     if image.dtype == np.uint8:
@@ -109,10 +100,11 @@ if __name__ == '__main__':
     parser.add_argument('--goal_image', type=str, default='goal_image.png')
     args = parser.parse_args()
 
+    ptu.set_gpu_mode(True)
+    torch.cuda.empty_cache()
+
     if not os.path.exists(args.video_save_dir) and args.video_save_dir:
         os.mkdir(args.video_save_dir)
-
-    ptu.set_gpu_mode(True)
 
     if args.robot_model == 'wx250s':
     	env = RobotEnv(robot_model='wx250s', control_hz=20, use_local_cameras=True, camera_types='cv2', blocking=args.blocking)
@@ -126,6 +118,7 @@ if __name__ == '__main__':
 
     with open(args.checkpoint_path, 'rb') as f:
         policy.load_state_dict(torch.load(f))
+    policy = policy.to(ptu.device)
 
     goal_image = Image.open(args.goal_image)
     goal_image = np.asarray(goal_image, dtype=np.uint8)
@@ -133,7 +126,7 @@ if __name__ == '__main__':
     plt.imshow(goal_image)
     plt.savefig('out.png')
 
-    eval_policy = policy.cuda()
+    eval_policy = policy
     eval_policy.eval()
 
     for i in range(num_trajs):
