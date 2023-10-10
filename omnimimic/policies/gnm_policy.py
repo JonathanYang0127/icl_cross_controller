@@ -55,6 +55,7 @@ class GaussianGNMPolicy(GNM_V9_SA):
     def forward(self, image, goal_image):
         h = super().forward(image, goal_image, return_final_repr=True)
         mean = self.last_fc(h)
+        distance = self.dist_predictor(h)
         #mean = torch.tanh(mean)        
         if self.std is None:
             if self.std_architecture == "shared":
@@ -70,10 +71,10 @@ class GaussianGNMPolicy(GNM_V9_SA):
             std = torch.from_numpy(np.array([self.std, ])).float().to(
                 ptu.device)
 
-        return Independent(Normal(mean, std), 1)
+        return distance, Independent(Normal(mean, std), 1)
 
 
-class GNMPolicy(GaussianGNMPolicy):
+class GNMPolicy(GNM_V9_SA):
     def __init__(self, **kwargs):
         super().__init__(
             context_size=kwargs['context_size'],
@@ -132,8 +133,8 @@ class GNMPolicy(GaussianGNMPolicy):
         for transform in self.transforms:
             image = transform(image)
             goal_image = transform(goal_image)
-        dist = super().forward(image, goal_image)
-        return dist
+        distance_pred, action_pred = super().forward(image, goal_image)
+        return distance_pred, action_pred
 
     def forward_np(self, image, goal_image, task_embedding=None):
         '''
@@ -153,22 +154,32 @@ class GNMPolicy(GaussianGNMPolicy):
         goal_image_data = torch.einsum('b h w c -> b c h w', goal_image)
         return self.forward(image_data, goal_image_data)
 
-    def compute_loss_np(self, image, goal_image, actions, task_embedding=None):
-        dist = self.forward_np(image, goal_image, task_embedding)
+    def compute_loss_np(self, image, goal_image, actions, goal_distances, task_embedding=None):
+        distance_pred, action_pred = self.forward_np(image, goal_image, task_embedding)
         actions = torch.from_numpy(actions).to(ptu.device)
-        policy_logpp = dist.log_prob(actions, )
-        policy_loss = -policy_logpp.mean()
+        goal_distances = torch.from_numpy(goal_distances).to(ptu.device)
 
-        action_pred = dist.mean
         mse_loss = F.mse_loss(action_pred.float(), actions.float(), reduction="none").mean()
 
+        distance_mse_loss = F.mse_loss(distance_pred[0].float(), goal_distances.float(), reduction="none").mean()
+        #loss = 0.01 * distance_mse_loss + mse_loss
+        loss = mse_loss
+
         similarity = torch.nn.CosineSimilarity(dim=1, eps=1e-08)
-        similarity_score = similarity(action_pred, actions)
-        return {'loss': policy_loss, 'policy_loss': policy_loss, 'mse_loss': mse_loss, 'action_cosine_similarity': similarity_score}
+        similarity_score = similarity(action_pred, actions).mean()
+
+        return {'loss': loss, 'mse_loss': mse_loss, 
+                'action_pred': action_pred, 
+                'action_cosine_similarity': similarity_score}
 
     def get_action(self, image, goal_image, task_embedding=None):
-        dist = self.forward_np(image, goal_image, task_embedding)
-        return dist.mean.detach().cpu().numpy()
+        distance_pred, action_pred_dist = self.forward_np(image, goal_image, task_embedding)
+        return action_pred_dist.mean.detach().cpu().numpy()
+
+    def get_distance_pred(self, image, goal_image, task_embedding=None):
+        distance_pred, action_pred_dist = self.forward_np(image, goal_image, task_embedding)
+        return distance_pred.detach().cpu().numpy()
+
 
     def configure_optimizers(self):
         return self.optimizer, self.scheduler

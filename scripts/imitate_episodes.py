@@ -19,8 +19,11 @@ from typing import Any, Dict
 from functools import partial
 
 from omnimimic.policies import GCConvPolicy, ACTPolicy, GNMPolicy
-from omnimimic.data_utils.rlds_data_transforms import RLDS_TRANSFORM_DICT
+from omnimimic.data.dataset import make_dataloader
+from omnimimic.train_utils.visualize_utils import (visualize_obs_action,
+    visualize_action_dist, visualize_goal_reaching_plots)
 import omnimimic.torch.pytorch_util as ptu
+
 
 from prettytable import PrettyTable
 import wandb
@@ -52,36 +55,6 @@ def make_policy(policy_class, policy_config):
 def make_optimizer(policy_class, policy):
     return policy.configure_optimizers()
 
-def decode_trajectory(builder, episode: Dict[str, Any]) -> Dict[str, Any]:
-    steps = episode['steps']
-    for key in steps:
-        steps[key] = builder.info.features["steps"][
-                        key
-                    ].decode_batch_example(steps[key]) 
-    return steps
-
-def make_dataloader(dataset_name, split, batch_size, data_dir=None, shuffle_size=5000):
-    builder = tfds.builder(dataset_name, data_dir=data_dir)
-    dataset = builder.as_dataset(
-            split=split,
-            decoders={"steps": tfds.decode.SkipDecoding()},
-            shuffle_files=True,
-        )
-
-    dataloader = dataset.map(partial(decode_trajectory, builder),
-        num_parallel_calls=tf.data.AUTOTUNE)
-    if dataset_name == 'bridge_dataset':
-        dataloader = dataloader.filter(lambda e: 
-            tf.math.reduce_mean(e['observation']['image_3'][0]) > 0)
-    if dataset_name in RLDS_TRANSFORM_DICT.keys():
-        dataloader = dataloader.map(RLDS_TRANSFORM_DICT[dataset_name])
-    dataloader = dataloader.flat_map(lambda e: tf.data.Dataset.from_tensor_slices(e))
-
-    dataloader = dataloader.shuffle(shuffle_size, reshuffle_each_iteration=True)
-    dataloader = dataloader.repeat()
-    dataloader = dataloader.batch(batch_size)
-    #dataloader = tfds.as_numpy(dataloader)
-    return dataloader
 
 def main(args):
     #Get argument values
@@ -100,12 +73,16 @@ def main(args):
     with open(policy_config_path, 'rb') as f:
         policy_config = yaml.safe_load(f)
     policy = make_policy(policy_class, policy_config)
+
+    if args['checkpoint_path'] is not None:
+        with open(args['checkpoint_path'], 'rb') as f:
+            policy.load_state_dict(torch.load(f))
     policy.to(ptu.device)
     if len(gpu_ids) > 1:
         policy = torch.nn.DataParallel(policy, device_ids=gpu_ids)
 
     batch_size_train = policy_config['batch_size']
-    batch_size_val = policy_config['batch_size']
+    batch_size_val = policy_config['batch_size_val']
     print(count_parameters(policy))
     lr = policy_config['lr']
 
@@ -114,24 +91,26 @@ def main(args):
     n_datasets = len(datasets)
     batch_size = batch_size_train // n_datasets
     train_dataloaders, val_dataloaders = [], []
+    config = {'wrist_image_only': args['wrist_only'], 
+              'seq_length': policy_config['len_traj_pred']}
     with tf.device('/cpu'):
         for dataset in datasets:
             if dataset in val_datasets:
                 train_split='train[:75%]'
             else:
                 train_split = 'train'
-            train_dataloader = make_dataloader(dataset, train_split, 
+            train_dataloader = make_dataloader(dataset, train_split, config, 
                 batch_size, data_dir=TFDS_DATA_DIR)
             train_dataloaders.append(train_dataloader)
 
             if dataset in val_datasets:
-                val_dataloader = make_dataloader(dataset, 'train[75%:]',
-                    batch_size, data_dir=TFDS_DATA_DIR)
+                val_dataloader = make_dataloader(dataset, 'train[75%:]', config,
+                    batch_size_val, data_dir=TFDS_DATA_DIR)
                 val_dataloaders.append(val_dataloader)
 
     current_time = datetime.now()
     checkpoint_dir = f'{exp_name}_{current_time.minute}-{current_time.hour}-{current_time.second}' 
-    checkpoint = os.path.join(ckpt_dir, checkpoint_dir)
+    checkpoint_dir = os.path.join(ckpt_dir, checkpoint_dir)
 
     #Define Train Config
     train_config = {
@@ -179,7 +158,13 @@ def compute_dict_mean(epoch_dicts):
 def detach_dict(d):
     new_d = dict()
     for k, v in d.items():
-        new_d[k] = v.detach()
+        new_d[k] = v.detach().cpu()
+    return new_d
+
+def numpy_dict(d):
+    new_d = dict()
+    for k, v in d.items():
+        new_d[k] = v.numpy()
     return new_d
 
 def train_bc(train_dataloaders, val_dataloaders, train_config, logger):
@@ -209,10 +194,15 @@ def train_bc(train_dataloaders, val_dataloaders, train_config, logger):
             obs = np.concatenate([batch['observation']['image'] for batch in data], axis=0)
             goal_image = np.concatenate([batch['goal_image'] for batch in data], axis=0)
             action = np.concatenate([batch['action'] for batch in data], axis=0)
+            goal_distances = np.concatenate([batch['goal_distance_indices'] 
+                for batch in data], axis=0)
+            goal_state = np.concatenate([batch['goal_state']
+                for batch in data], axis=0)
+
             #task_embedding = np.concatenate((batch['task_embedding'] for batch in data), axis=0)
             #loss_dict = policy.compute_loss_np(data['observation']['image'], 
             #        data['observation']['goal_image'], data['action'], data['task_embedding'])
-            loss_dict = policy.compute_loss_np(obs, goal_image, action, task_embedding=None)
+            loss_dict = policy.compute_loss_np(obs, goal_image, action, goal_distances, task_embedding=None)
             loss = loss_dict['loss']
             loss.backward()
             #print(torch.cuda.mem_get_info())
@@ -220,7 +210,14 @@ def train_bc(train_dataloaders, val_dataloaders, train_config, logger):
             optimizer.step()
             optimizer.zero_grad()
 
-            train_epoch_dicts.append(detach_dict(loss_dict))
+            loss_dict = detach_dict(loss_dict)
+            train_epoch_dicts.append(loss_dict)
+        
+        visualize_dict = numpy_dict(loss_dict)
+        visualize_obs_action(obs, goal_image, action, visualize_dict, epoch=epoch)
+        visualize_goal_reaching_plots(obs, goal_image, goal_state, action, visualize_dict, epoch=epoch)
+        # visualize_action_dist(action, visualize_dict, epoch=epoch)
+
         if scheduler is not None:
             scheduler.step()
         train_epoch_summary = compute_dict_mean(train_epoch_dicts)
@@ -238,14 +235,27 @@ def train_bc(train_dataloaders, val_dataloaders, train_config, logger):
                     obs = [batch['observation']['image'] for batch in data]
                     goal_image = [batch['goal_image'] for batch in data]
                     action = [batch['action'] for batch in data]
+                    goal_distances = [batch['goal_distance_indices'] for batch in data]
+                    goal_state = [batch['goal_state'] for batch in data]
 
                     epoch_loss_dict = {}
                     for dataloader_idx in range(len(val_dataloaders)):
                         dataset_name = val_datasets[dataloader_idx]
                         loss_dict = policy.compute_loss_np(obs[dataloader_idx], goal_image[dataloader_idx], 
-                                action[dataloader_idx], task_embedding=None)
+                                action[dataloader_idx], goal_distances[dataloader_idx], task_embedding=None)
                         loss_dict = {key + '/'+ dataset_name: value for key, value in loss_dict.items()}
-                        epoch_loss_dict.update(detach_dict(loss_dict))
+                        loss_dict = detach_dict(loss_dict)
+                        epoch_loss_dict.update(loss_dict)
+
+                        if batch_idx == num_vals_per_val_loop - 1:
+                            visualize_dict = numpy_dict(loss_dict)
+                            visualize_obs_action(obs[dataloader_idx], goal_image[dataloader_idx], 
+                                action[dataloader_idx], visualize_dict, val_key=dataset_name, epoch=epoch)
+                            visualize_goal_reaching_plots(obs[dataloader_idx], goal_image[dataloader_idx], goal_state[dataloader_idx], 
+                                action[dataloader_idx], visualize_dict, val_key=dataset_name, epoch=epoch)
+
+                            #visualize_action_dist(action[dataloader_idx], visualize_dict, val_key=dataset_name,
+                            #        epoch=epoch)
                     val_epoch_dicts.append(epoch_loss_dict)
                     
                 val_epoch_summary = compute_dict_mean(val_epoch_dicts)
@@ -266,9 +276,13 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--datasets', type=str, nargs='+', required=True)
     parser.add_argument('--val-datasets', type=str, nargs='+', default=[])
-    parser.add_argument('--gpu-ids', type=str, nargs='+', default=[0])
+    parser.add_argument('--gpu-ids', type=str, nargs='+', default=['0'])
+    parser.add_argument('--checkpoint-path', type=str, default=None)
+    parser.add_argument('--wrist-only', action='store_true', default=False)
     args = parser.parse_args()
-  
+
+
+
     print("Num GPUs: {}", torch.cuda.device_count())
     ptu.set_gpu_mode(True, gpu_ids=args.gpu_ids)
 
