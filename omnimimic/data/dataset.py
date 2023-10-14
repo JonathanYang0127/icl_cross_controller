@@ -31,8 +31,7 @@ def apply_common_transforms(dataset, config):
     return dataset
 
 
-def make_dataloader(dataset_name, split, dataloader_config,
-        batch_size, data_dir=None):
+def make_dataloader(dataset_name, split, dataloader_config, data_dir=None):
     builder = tfds.builder(dataset_name, data_dir=data_dir)
     dataset = builder.as_dataset(
             split=split,
@@ -53,11 +52,14 @@ def make_dataloader(dataset_name, split, dataloader_config,
             num_parallel_calls=tf.data.AUTOTUNE
         )
     dataloader = apply_common_transforms(dataloader, dataloader_config)
-    #dataloader = dataloader.map(lambda e: tf.data.Dataset.from_tensor_slices(e))
-
     dataloader = dataloader.repeat()
+    
+    return dataloader
+
+def shuffle_batch_and_prefetch_dataloader(dataloader, batch_size, shuffle_size=None):
+    if shuffle_size is not None:
+        dataloader = dataloader.shuffle(shuffle_size)
     dataloader = dataloader.batch(batch_size)
     dataloader = dataloader.prefetch(1)
-    #dataloader = tfds.as_numpy(dataloader)
     return dataloader
 

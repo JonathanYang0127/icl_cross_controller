@@ -55,6 +55,13 @@ def process_batch_transform(traj):
     new_traj['goal_distance_indices'] = traj['goal_distance_indices'][0]
     new_traj['action'] = traj['action']
 
-
+    '''
+    new_traj['observation'] = dict()
+    new_traj['observation']['image'] = traj['observation']['image']
+    new_traj['goal_image'] = traj['goal_image']
+    new_traj['goal_state'] = traj['goal_state']
+    new_traj['goal_distance_indices'] = traj['goal_distance_indices']
+    new_traj['action'] = traj['action']
+    '''
     return new_traj
 

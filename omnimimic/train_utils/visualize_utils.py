@@ -58,6 +58,8 @@ def visualize_goal_reaching_plots(obs_image, goal_image, goal_state, action, los
         gt_waypoints = -action[i][:, 2:0:-1]
         pred_waypoints = np.concatenate(([[0, 0]], pred_waypoints), axis=0)
         gt_waypoints = np.concatenate(([[0, 0]], gt_waypoints), axis=0)
+        print("pred_waypoints", pred_waypoints)
+        print("gt_waypoints", gt_waypoints)
         trajs = [pred_waypoints, gt_waypoints]
         fig, ax = plt.subplots(1, 3)
         start_pos = np.array([0, 0])  

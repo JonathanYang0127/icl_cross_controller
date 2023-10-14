@@ -32,7 +32,8 @@ def gnm_dataset_transform(
 
 def gnm_dataset_transform_nodecode(
     trajectory: Dict[str, Any],
-    config
+    config,
+    max_goal_distance=30
 ) -> Dict[str, Any]:
 
     #Relabel actions
@@ -64,13 +65,13 @@ def gnm_dataset_transform_nodecode(
             -trajectory["action_sequence"][:,:, 0:1],
             tf.zeros((traj_len, len_seq_pred, 4), dtype=tf.float64)
             ), axis=-1)
-    #trajectory["action_sequence"] = tf.zeros((traj_len, len_seq_pred, 7), dtype=tf.float64)
     trajectory["action"] = trajectory["action_sequence"][:, 0, :]
 
     #Relabel random goals
     rand = tf.random.uniform(shape=[traj_len])
     low = tf.cast(tf.range(traj_len) + len_seq_pred, dtype=tf.float32)
-    high = tf.ones_like(low) * tf.cast(traj_len, dtype=tf.float32)
+    #high = tf.ones_like(low) * tf.cast(traj_len, dtype=tf.float32)
+    high = tf.minimum(low + max_goal_distance, tf.cast(traj_len, dtype=tf.float32))
     goal_idxs = tf.cast((high-low) * rand + low, dtype=tf.int32)
     goal_idxs = tf.minimum(goal_idxs, traj_len - 1)
     
