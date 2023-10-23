@@ -124,9 +124,15 @@ class GNMPolicy(GNM_V9_SA):
                     after_scheduler=self.scheduler,
                 )
         elif kwargs['scheduler'] == 'cosinewarm':
-            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-                self.optimizer, T_0=1, T_mult=2
+            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer, T_max=50
             )
+            self.scheduler = GradualWarmupScheduler(
+                    self.optimizer, 
+                    multiplier=1,
+                    total_epoch=5,
+                    after_scheduler=self.scheduler,
+                )
         else:
             self.scheduler = None
 
@@ -176,7 +182,11 @@ class GNMPolicy(GNM_V9_SA):
 
         goal_distances = torch.from_numpy(goal_distances).to(ptu.device)
         mse_loss = F.mse_loss(action_pred.float(), actions.float(), reduction="none").mean()
-        
+        action_means = torch.mean(actions, dim=0).detach()
+        mask = torch.where(action_means > 1e-9, 1.0, 0.0)
+        normalization = torch.sum(mask)
+        mse_loss = mse_loss * float(action_means.shape[-1]) / normalization.float()
+
         distance_mse_loss = F.mse_loss(distance_pred[:, 0].float(), goal_distances.float(), reduction="none").mean()
         #loss = 0.01 * distance_mse_loss + mse_loss
         loss = mse_loss
@@ -190,7 +200,7 @@ class GNMPolicy(GNM_V9_SA):
 
     def get_action(self, image, goal_image, task_embedding=None):
         distance_pred, action_pred_dist = self.forward_np(image, goal_image, task_embedding)
-        return action_pred_dist.mean.detach().cpu().numpy()
+        return action_pred_dist.detach().cpu().numpy()
 
     def get_distance_pred(self, image, goal_image, task_embedding=None):
         distance_pred, action_pred_dist = self.forward_np(image, goal_image, task_embedding)
@@ -292,6 +302,10 @@ class ViNTPolicy(ViNT):
 
         goal_distances = torch.from_numpy(goal_distances).to(ptu.device)
         mse_loss = F.mse_loss(action_pred.float(), actions.float(), reduction="none").mean()
+        action_means = torch.mean(actions, dim=0).detach()
+        mask = torch.where(action_means > 1e-9, 1.0, 0.0)
+        normalization = torch.sum(mask)
+        mse_loss = mse_loss * action_means.shape(-1).float() / normalization.float()
 
         distance_mse_loss = F.mse_loss(distance_pred[:, 0].float(), goal_distances.float(), reduction="none").mean()
         #loss = 0.01 * distance_mse_loss + mse_loss
@@ -306,7 +320,7 @@ class ViNTPolicy(ViNT):
 
     def get_action(self, image, goal_image, task_embedding=None):
         distance_pred, action_pred_dist = self.forward_np(image, goal_image, task_embedding)
-        return action_pred_dist.mean.detach().cpu().numpy()
+        return action_pred_dist.detach().cpu().numpy()
 
     def get_distance_pred(self, image, goal_image, task_embedding=None):
         distance_pred, action_pred_dist = self.forward_np(image, goal_image, task_embedding)

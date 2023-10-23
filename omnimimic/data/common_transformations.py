@@ -1,5 +1,33 @@
 import tensorflow as tf
-from .data_utils import selective_tree_map
+from .data_utils import *
+
+
+def normalize_obs_and_actions(traj, action_keys, metadata):
+    '''
+    For now, only normalize appropriate action keys
+    '''
+    normal_keys = []
+    min_max_keys = action_keys
+    
+    for key in normal_keys:
+        map_nested_dict_index(
+            traj,
+            key,
+            lambda x: (x - metadata[key]["mean"]) / metadata[key]["std"]
+        )
+
+    for key in min_max_keys:
+        map_nested_dict_index(
+            traj,
+            key,
+            lambda x: tf.clip_by_value(2 * (x - metadata[key]["min"])
+                / (metadata[key]["max"] - metadata[key]["min"]) - 1,
+                -1,
+                1)
+        )
+
+    return traj
+
 
 def random_dataset_sequence_transform_v2(traj, frame_stack, seq_length,
     pad_frame_stack, pad_seq_length):
@@ -9,12 +37,41 @@ def random_dataset_sequence_transform_v2(traj, frame_stack, seq_length,
 
     if 'action_sequence' in traj.keys():
         traj_len = tf.shape(traj["action"])[0]
-        index_in_demo = tf.random.uniform(shape=[],
-            maxval=traj_len, dtype=tf.int32)
-        traj['action'] = traj['action_sequence'][index_in_demo]
-        traj['observation']['image'] = traj['observation']['image'][index_in_demo][None]
+        traj['action'] = traj['action_sequence']
+        traj['observation']['image'] = traj['observation']['image']
         for k in traj.keys():
             if 'goal' in k:    
+                traj[k] = traj[k]
+        return traj
+
+    traj_len = tf.shape(traj["action"])[0]
+
+    #Pad actions
+    padding = tf.tile(tf.zeros_like(traj['action'][-1:, :]),
+            [seq_length - 1, 1])
+    traj['action'] = tf.concat(
+        (traj['action'], padding),
+        axis=0)
+
+    #Get sequence length actions
+    indices = tf.reshape(tf.range(traj_len), [-1, 1])  \
+        + tf.range(0, seq_length)
+    traj['action'] = tf.gather(traj['action'], indices)
+
+    return traj
+
+
+def random_dataset_sequence_transform(traj, frame_stack, seq_length,
+    pad_frame_stack, pad_seq_length):
+    '''
+    Extract a random subsequence of the data given sequence_length given keys
+    '''
+
+    if 'action_sequence' in traj.keys():
+        traj['action'] = traj['action_sequence']
+        traj['observation']['image'] = traj['observation']['image'][index_in_demo][None]
+        for k in traj.keys():
+            if 'goal' in k:
                 traj[k] = traj[k][index_in_demo][None]
         return traj
 
@@ -25,10 +82,10 @@ def random_dataset_sequence_transform_v2(traj, frame_stack, seq_length,
     if pad_seq_length:
         seq_end_pad = seq_length - 1
     index_in_demo = tf.random.uniform(shape=[],
-            maxval=traj_len + seq_end_pad - (seq_length - 1), 
+            maxval=traj_len + seq_end_pad - (seq_length - 1),
           dtype=tf.int32)
     pad_mask = tf.concat((tf.repeat(0, repeats=seq_begin_pad),
-                        tf.repeat(1, repeats=traj_len), 
+                        tf.repeat(1, repeats=traj_len),
                         tf.repeat(0, repeats=seq_end_pad)), axis=0)[:, None]
     traj['pad_mask'] = tf.cast(pad_mask, dtype=tf.bool)
     keys = ["observation", "action",  "goal"]
@@ -45,6 +102,18 @@ def random_dataset_sequence_transform_v2(traj, frame_stack, seq_length,
         map_fn=random_sequence_func
     )
     return traj
+
+
+def process_batch_transform_v2(traj):
+    new_traj = dict()
+    new_traj['observation'] = dict()
+    new_traj['observation']['image'] = traj['observation']['image']
+    new_traj['goal_image'] = traj['goal_image']
+    #if 'goal_state' in traj.keys():
+    #    new_traj['goal_state'] = traj['goal_state']
+    new_traj['goal_distance_indices'] = traj['goal_distance_indices']
+    new_traj['action'] = tf.cast(traj['action'], dtype=tf.float32)
+    return new_traj
 
 def process_batch_transform(traj):
     new_traj = dict()

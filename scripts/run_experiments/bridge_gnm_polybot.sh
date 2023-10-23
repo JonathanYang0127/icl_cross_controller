@@ -14,7 +14,7 @@ conda deactivate
 conda activate navigation_env
 
 cd /iris/u/jyang27/dev/omnimimic/scripts
-python imitate_episodes.py --policy-class GNM --policy-config ../policy_config/gnmv9_policy.yaml --dataset polybot_dataset gnm_dataset bridge_dataset --val-dataset polybot_dataset gnm_dataset bridge_dataset --seed 30
+python imitate_episodes.py --policy-class GNM --policy-config ../policy_config/gnmv9_policy.yaml --dataset polybot_dataset gnm_dataset bridge_dataset --val-dataset polybot_dataset gnm_dataset bridge_dataset --seed 30 --no-visualization
 
 
 #done

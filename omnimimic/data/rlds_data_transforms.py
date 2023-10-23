@@ -33,7 +33,7 @@ def gnm_dataset_transform(
 def gnm_dataset_transform_nodecode(
     trajectory: Dict[str, Any],
     config,
-    max_goal_distance=30
+    max_goal_distance=20
 ) -> Dict[str, Any]:
 
     #Relabel actions
@@ -52,7 +52,9 @@ def gnm_dataset_transform_nodecode(
     global_waypoints = tf.gather(trajectory['observation']['state'], indices)[:, :, :2]
 
     #Get current position indices
-    curr_pos = tf.expand_dims(trajectory['observation']['state'][:traj_len, :2], 1)
+    curr_pos_indices = tf.reshape(tf.range(traj_len), [-1, 1]) + tf.range(0, len_seq_pred)
+    curr_pos = tf.gather(trajectory['observation']['state'], curr_pos_indices)[:, :, :2]
+    #curr_pos = tf.expand_dims(trajectory['observation']['state'][:traj_len, :2], 1)
     global_waypoints -= curr_pos
     global_waypoints = tf.expand_dims(global_waypoints, 2)
     trajectory["action_sequence"] = tf.squeeze(tf.linalg.matmul(global_waypoints, tf.expand_dims(
@@ -106,6 +108,10 @@ def polybot_dataset_transform_nodecode(
         lambda x: tf.gather(x, goal_idxs),
         trajectory["observation"]["image"]
     )
+    trajectory["goal_state"] = tf.nest.map_structure(
+        lambda x: tf.gather(x, goal_idxs),
+        trajectory["observation"]["state"]
+    )[:, 1:3]
     #trajectory["goal_pose"] = tf.nest.map_structure(
     #    lambda x: tf.gather(x, goal_idxs),
     #    trajectory["observation"]["cartesian_pose"]
@@ -167,8 +173,10 @@ def r2d2_dataset_transform_nodecode(
         image_keys = ['wrist_image_left', 'wrist_image_right']
     key = np.random.choice(image_keys)
     trajectory["observation"]["image"] = trajectory["observation"][key][:,::4,::4,:]
+    trajectory["observation"]["image"] = tf.cast(trajectory["observation"]["image"], dtype='float32') / 255.0
     trajectory["observation"]["image"] = tf.image.resize(trajectory["observation"]["image"],
             size=(64, 64), method='bicubic')
+    trajectory["observation"]["image"] = tf.cast(trajectory["observation"]["image"] * 255.0, dtype='uint8')
 
     #Set image as wrist camera image
     #trajectory["observation"]["image"] = trajectory["observation"]["image_3"][:,::4,::4,:]

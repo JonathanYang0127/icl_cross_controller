@@ -42,7 +42,7 @@ class GNM_V9_SA(BaseModel):
         else:
             raise NotImplementedError
         
-        self.goal_encoder = EfficientNet.from_name("efficientnet-b0", in_channels=6) # obs+goal
+        self.goal_encoder = EfficientNet.from_name(obs_encoder, in_channels=6) # obs+goal
         self.num_goal_features = self.goal_encoder._fc.in_features
 
         #self.goal_encoder_params = nn.ParameterList(list(self.goal_encoder.parameters()))
@@ -131,10 +131,11 @@ class GNM_V9_SA(BaseModel):
         action_pred = action_pred.reshape(
             (action_pred.shape[0], self.len_trajectory_pred, self.num_action_params)
         )
-
+        '''
         action_pred[:, :, :2] = torch.cumsum(
             action_pred[:, :, :2], dim=1
         )  # convert position deltas into waypoints
+        '''
         '''
         if self.learn_angle:
             action_pred[:, :, 2:] = F.normalize(

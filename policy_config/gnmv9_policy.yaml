@@ -9,11 +9,11 @@ batch_size_val: 64
 epochs: 50
 gpu_ids: [5, 6, 7]
 num_workers: 12
-lr: 3e-4
+lr: 5e-4
 optimizer: adamw
 clipping: False
 max_norm: 1.
-scheduler: null#"cosinewarm"
+scheduler: "cosinewarm"
 warmup: True # True
 warmup_epochs: 50
 cyclic_period: 50
