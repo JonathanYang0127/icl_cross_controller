@@ -6,7 +6,7 @@ use_wandb: True # set to false if you don't want to log to wandb
 train: True
 batch_size: 256
 batch_size_val: 64
-epochs: 50
+epochs: 100
 gpu_ids: [5, 6, 7]
 num_workers: 12
 lr: 5e-4
@@ -15,8 +15,8 @@ clipping: False
 max_norm: 1.
 scheduler: "cosinewarm"
 warmup: True # True
-warmup_epochs: 50
-cyclic_period: 50
+warmup_epochs: 100
+cyclic_period: 100
 plateau_patience: 3
 plateau_factor: 0.5
 seed: 0
@@ -24,8 +24,8 @@ seed: 0
 
 # model params
 model_type: gnm_v9_sa
-obs_encoder: "efficientnet-b0" # by default, this is imagenet pretrained
-goal_encoder: "efficientnet-b0"
+obs_encoder: "efficientnet-b3" # by default, this is imagenet pretrained
+goal_encoder: "efficientnet-b3"
 goal_embedding_size: null # goal_clip_embd.shape[1]
 input_width: 64
 input_height: 64
