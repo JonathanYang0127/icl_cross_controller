@@ -5,6 +5,7 @@ from .rlds_data_transforms import RLDS_TRANSFORM_DICT
 from .common_transformations import *
 from .data_utils import *
 from tqdm import tqdm
+import dlimp as dl
 import numpy as np
 import pickle
 
@@ -14,11 +15,28 @@ def decode_trajectory(builder, episode):
         steps[key] = builder.info.features["steps"][
                         key
                     ].decode_batch_example(steps[key])
+    if 'file_path' in episode['episode_metadata'].keys():
+        steps['file_path'] = builder.info.features[
+            'episode_metadata']['file_path'].decode_batch_example(
+            episode['episode_metadata']['file_path'])
     return steps
 
 def apply_common_transforms(dataset, config, 
     obs_action_metadata=None):
-    if obs_action_metadata is not None:
+    #Resize image
+    dataset = dataset.map(
+        resize_image,
+        num_parallel_calls=tf.data.AUTOTUNE
+    )
+
+    #Relabel goals
+    dataset = dataset.map(
+        relabel_goal_image,
+        num_parallel_calls=tf.data.AUTOTUNE
+    )
+
+    #Normalize actions
+    if obs_action_metadata is not None and not config['no_normalization']:
         dataset = dataset.map(
             partial(
                 normalize_obs_and_actions,
@@ -27,7 +45,8 @@ def apply_common_transforms(dataset, config,
             ),
             num_parallel_calls=tf.data.AUTOTUNE
         )
-     
+
+    #Get random action sequence
     dataset = dataset.map(
         partial(
             random_dataset_sequence_transform_v2,
@@ -39,8 +58,13 @@ def apply_common_transforms(dataset, config,
         num_parallel_calls=tf.data.AUTOTUNE
     )
 
+    #Process correct keys
     dataset = dataset.map(
-        process_batch_transform_v2
+        partial(
+            process_batch_transform_v2,
+            use_goal_state=config['visualize']
+        ),
+        num_parallel_calls=tf.data.AUTOTUNE
     )
     return dataset
 
@@ -87,20 +111,19 @@ def get_obs_action_metadata(
 
     return metadata
 
+
 def make_dataloader(dataset_name, split, dataloader_config, data_dir=None):
     builder = tfds.builder(dataset_name, data_dir=data_dir)
+    '''
     dataset = builder.as_dataset(
             split=split,
             decoders={"steps": tfds.decode.SkipDecoding()},
             shuffle_files=True,
         )
-
-    dataloader = dataset.map(partial(decode_trajectory, builder),
-        num_parallel_calls=tf.data.AUTOTUNE)
-    if dataloader_config['wrist_image_only']:
-        if dataset_name == 'bridge_dataset':
-            dataloader = dataloader.filter(lambda e:
-                tf.math.reduce_mean(e['observation']['image_3'][0]) > 0)
+    '''
+    dataloader = dl.DLataset.from_rlds(builder, split=split, shuffle=True,
+        num_parallel_reads=6)
+    #dataloader = decode_dataloader(dataloader)
     if dataset_name in RLDS_TRANSFORM_DICT.keys():
         dataloader = dataloader.map(partial(
             RLDS_TRANSFORM_DICT[dataset_name],
@@ -115,12 +138,16 @@ def make_dataloader(dataset_name, split, dataloader_config, data_dir=None):
         action_keys,
         load_if_exists=True,
     )
+    print(f'{dataset_name}: {metadata}')
     dataloader = apply_common_transforms(dataloader, dataloader_config, 
             obs_action_metadata=metadata)
+    #Ensure observations are not 0
+    dataloader = dataloader.filter(lambda e:
+        tf.math.reduce_mean(e['observation']['image']) > 0)
     dataloader = dataloader.flat_map(lambda e: tf.data.Dataset.from_tensor_slices(e))
     dataloader = dataloader.repeat()
     
-    return dataloader
+    return dataloader, metadata
 
 def shuffle_batch_and_prefetch_dataloader(dataloader, batch_size, shuffle_size=None):
     if shuffle_size is not None:

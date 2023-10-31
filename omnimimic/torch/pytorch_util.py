@@ -52,7 +52,6 @@ def kronecker_product(t1, t2):
     out_height = t1_height * t2_height
     out_width = t1_width * t2_width
 
-    # TODO(vitchyr): see if you can use expand instead of repeat
     tiled_t2 = t2.repeat(t1_height, t1_width)
     expanded_t1 = (
         t1.unsqueeze(2)
@@ -231,9 +230,8 @@ def set_gpu_mode(mode, gpu_ids=[0]):
     global _gpu_id
     _gpu_ids = gpu_ids
     _use_gpu = mode
-    device = torch.device("cuda:" + ",".join([str(x) 
+    device = torch.device("cuda:" + ",".join([str(x)
         for x in gpu_ids]) if _use_gpu else "cpu")
-
 
 def gpu_enabled():
     return _use_gpu

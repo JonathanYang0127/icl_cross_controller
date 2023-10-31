@@ -2,6 +2,7 @@ import numpy as np
 import wandb
 import matplotlib.pyplot as plt
 from typing import Dict, Optional
+from omnimimic.data.data_utils import unnormalize_action
 
 #Define colors for convenience
 RED = np.array([1, 0, 0])
@@ -47,15 +48,26 @@ def visualize_action_dist(action, loss_dict, val_key='Train', epoch=0):
                 title=f'Action Pred Dim {i} Distribution')}, step=epoch)
 
 
-def visualize_goal_reaching_plots(obs_image, goal_image, goal_state, action, loss_dict, num_plots=5, val_key='Train', epoch=0):
+def visualize_goal_reaching_plots(obs_image, goal_image, goal_state, action, loss_dict, 
+    metadata, num_plots=5, val_key='Train', epoch=0, no_normalization=False):
     action_pred_key = [k for k in loss_dict.keys() if 'action_pred' in k][0]
 
     for i in range(num_plots):
         obs_img = obs_image[i]
         goal_img = goal_image[i]
         goal_pos = goal_state[i][:2]
-        pred_waypoints = -loss_dict[action_pred_key][i][:, 2:0:-1]
-        gt_waypoints = -action[i][:, 2:0:-1]
+        pred_waypoints = loss_dict[action_pred_key][i]
+        gt_waypoints = action[i]
+        if not no_normalization:
+            pred_waypoints = unnormalize_action(pred_waypoints)
+            gt_waypoints = unnormalize_action(gt_waypoints)
+        pred_waypoints = pred_waypoints[:, 2:0:-1]
+        gt_waypoints = gt_waypoints[:, 2:0:-1]
+        pred_waypoints[:, 0] *= -1
+        gt_waypoints = np.copy(gt_waypoints)
+        gt_waypoints[:, 0] *= -1
+        pred_waypoints = np.cumsum(pred_waypoints, axis=0)
+        gt_waypoints = np.cumsum(gt_waypoints, axis=0)
         pred_waypoints = np.concatenate(([[0, 0]], pred_waypoints), axis=0)
         gt_waypoints = np.concatenate(([[0, 0]], gt_waypoints), axis=0)
         print("pred_waypoints", pred_waypoints)

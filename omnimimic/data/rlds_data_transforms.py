@@ -1,40 +1,29 @@
 from typing import Any, Dict
+from functools import partial
+from .data_utils import *
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import numpy as np
 import rlds
 
+GNM_NORMALIZE_DICT = {
+    'recon': 0.25,
+    'scand': 0.38,
+    'tartan_drive': 0.72,
+    'go_stanford': 0.12,
+    'cory_hall': 0.06,
+    'seattle': 0.35,
+    'sacson': 0.255
+}
+
+
 def gnm_dataset_transform(
     trajectory: Dict[str, Any],
-    config
-) -> Dict[str, Any]:
-
-    def edit_action(step):
-        step["action"] = tf.concat((
-            tf.zeros(1, dtype=tf.dtypes.float64),
-            -step["action"][1:2],
-            -step["action"][0:1],
-            tf.zeros(4, dtype=tf.dtypes.float64)
-        ), axis=0)
-        return step
-    #goal_image = [i for i in trajectory[rlds.STEPS]][-1]['observation']['image']
-    #goal_image = None
-     #ds= trajectory[rlds.STEPS].as_numpy_iterator()
-    step = rlds.transformations.final_step(trajectory[rlds.STEPS])
-    goal_image = step['observation']['image']    
-    def edit_goal_image(step):
-        step['goal_image'] = goal_image
-        return step
-     
-    trajectory[rlds.STEPS] = trajectory[rlds.STEPS].map(edit_action, num_parallel_calls=tf.data.AUTOTUNE)
-    trajectory[rlds.STEPS] = trajectory[rlds.STEPS].map(edit_goal_image, num_parallel_calls=tf.data.AUTOTUNE)
-    return trajectory[rlds.STEPS]
-
-def gnm_dataset_transform_nodecode(
-    trajectory: Dict[str, Any],
     config,
-    max_goal_distance=20
+    min_goal_distance=20
 ) -> Dict[str, Any]:
+    #Decode Image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"]["image"])
 
     #Relabel actions
     traj_len = tf.shape(trajectory["action"])[0]
@@ -63,20 +52,23 @@ def gnm_dataset_transform_nodecode(
     #Transform into manipulation coords
     trajectory["action_sequence"] = tf.concat((
             tf.zeros((traj_len, len_seq_pred, 1), dtype=tf.float64),
-            -trajectory["action_sequence"][:,:, 1:2],
+            trajectory["action_sequence"][:,:, 1:2],
             -trajectory["action_sequence"][:,:, 0:1],
             tf.zeros((traj_len, len_seq_pred, 4), dtype=tf.float64)
             ), axis=-1)
     trajectory["action"] = trajectory["action_sequence"][:, 0, :]
 
-    #Relabel random goals
-    rand = tf.random.uniform(shape=[traj_len])
-    low = tf.cast(tf.range(traj_len) + len_seq_pred, dtype=tf.float32)
-    #high = tf.ones_like(low) * tf.cast(traj_len, dtype=tf.float32)
-    high = tf.minimum(low + max_goal_distance, tf.cast(traj_len, dtype=tf.float32))
-    goal_idxs = tf.cast((high-low) * rand + low, dtype=tf.int32)
-    goal_idxs = tf.minimum(goal_idxs, traj_len - 1)
+    #Get normalization factor
+    normalization_factor = 1.0
+    for dataset_name, value in GNM_NORMALIZE_DICT.items():
+        if tf.strings.regex_full_match(trajectory['traj_metadata']['episode_metadata']['file_path'][0],
+             f'.*{dataset_name}.*'):
+            normalization_factor = value
+    normalization_factor = tf.cast(normalization_factor, tf.float64)
+    trajectory["action_sequence"] /= normalization_factor
     
+    #Relabel random goals
+    high, low, goal_idxs = get_goal_idxs(traj_len, min_goal_distance=min_goal_distance)
     trajectory["goal_image"] = tf.nest.map_structure(
         lambda x: tf.gather(x, goal_idxs),
         trajectory["observation"]["image"]
@@ -89,20 +81,22 @@ def gnm_dataset_transform_nodecode(
     trajectory["goal_state"] = tf.expand_dims(trajectory["goal_state"], 1)
     trajectory["goal_state"] = tf.squeeze(tf.linalg.matmul(trajectory["goal_state"],
         trajectory['observation']['yaw_rotmat'][:, :2, :2]), 1)
+    trajectory["goal_state"] /= normalization_factor
     trajectory["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - low
     return trajectory
 
-def polybot_dataset_transform_nodecode(
+
+def polybot_dataset_transform(
     trajectory: Dict[str, Any],
     config
 ) -> Dict[str, Any]:
+
+    #Decode Image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"]["image"])
+
     #Relabel random goals
-    traj_len = len(trajectory["action"])
-    rand = tf.random.uniform(shape=[traj_len])
-    low = tf.cast(tf.range(traj_len), dtype=tf.float32)
-    high = tf.ones_like(low) * tf.cast(traj_len, dtype=tf.float32)
-    goal_idxs = tf.cast((high-low) * rand + low, dtype=tf.int32)
-    goal_idxs = tf.minimum(goal_idxs, traj_len - 1)
+    traj_len = tf.shape(trajectory["action"])[0]
+    high, low, goal_idxs = get_goal_idxs(traj_len)
 
     trajectory["goal_image"] = tf.nest.map_structure(
         lambda x: tf.gather(x, goal_idxs),
@@ -124,83 +118,277 @@ def polybot_dataset_transform_nodecode(
     return trajectory
 
 
-def bridge_dataset_transform_nodecode(
+def bridge_dataset_transform(
     trajectory: Dict[str, Any],
     config
 ) -> Dict[str, Any]:
-    print("keys", trajectory.keys())
-    print(trajectory["observation"].keys())
-    #set image as wrist image
+
+    #Set image key
     image_keys = []
     for key in trajectory["observation"].keys():
-        if "image" in key and tf.math.reduce_mean(trajectory['observation'][key][0]) > 0:
+        if "image" in key:
             image_keys.append(key)
     if config['wrist_image_only']:
         image_keys = ['image_3']
     key = np.random.choice(image_keys)
-    trajectory["observation"]["image"] = trajectory["observation"][key][:,::4,::4,:]
-    
-    #Set image as wrist camera image
-    #trajectory["observation"]["image"] = trajectory["observation"]["image_3"][:,::4,::4,:]
 
-    #Relabel random goals
-    traj_len = len(trajectory["action"])
-    rand = tf.random.uniform(shape=[traj_len])
-    low = tf.cast(tf.range(traj_len), dtype=tf.float32)
-    high = tf.ones_like(low) * tf.cast(traj_len, dtype=tf.float32)
-    goal_idxs = tf.cast((high-low) * rand + low, dtype=tf.int32)
-    goal_idxs = tf.minimum(goal_idxs, traj_len - 1)
+    #Decode Image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"][key])
 
-    trajectory["goal_image"] = tf.nest.map_structure(
-        lambda x: tf.gather(x, goal_idxs),
-        trajectory["observation"]["image"]
-    )
-    trajectory["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - low
+    #Resize Image
+    trajectory["observation"]["image"] = tf.cast(trajectory["observation"]["image"], dtype='float32') / 255.0
+    trajectory["observation"]["image"] = tf.image.resize(trajectory["observation"]["image"],
+            size=(64, 64), method='bicubic')
+    trajectory["observation"]["image"] = tf.cast(trajectory["observation"]["image"] * 255.0, dtype='uint8')
+ 
+    #Mirror Wrist Image
+    if key == 'image_3':
+        trajectory["observation"]["image"] = trajectory["observation"]['image'][:,::-1,::-1,:]    
+
+    #Reverse Action Dim 1 
+    trajectory["action"] *= [1, -1, 1, 1, 1, 1, 1]
+
     return trajectory
 
-def r2d2_dataset_transform_nodecode(
+
+def r2d2_dataset_transform(
     trajectory: Dict[str, Any],
     config
 ) -> Dict[str, Any]:
-    print("keys", trajectory.keys())
-    print(trajectory["observation"].keys())
-    #set image as wrist image
+    
+    #Set image key
     image_keys = []
     for key in trajectory["observation"].keys():
-        if "image" in key and tf.math.reduce_mean(trajectory['observation'][key][0]) > 0:
+        if "image" in key:
             image_keys.append(key)
     if config['wrist_image_only']:
         image_keys = ['wrist_image_left', 'wrist_image_right']
     key = np.random.choice(image_keys)
-    trajectory["observation"]["image"] = trajectory["observation"][key][:,::4,::4,:]
+    
+    #Decode Image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"][key])
+
+    #Resize Image
     trajectory["observation"]["image"] = tf.cast(trajectory["observation"]["image"], dtype='float32') / 255.0
     trajectory["observation"]["image"] = tf.image.resize(trajectory["observation"]["image"],
             size=(64, 64), method='bicubic')
     trajectory["observation"]["image"] = tf.cast(trajectory["observation"]["image"] * 255.0, dtype='uint8')
 
-    #Set image as wrist camera image
-    #trajectory["observation"]["image"] = trajectory["observation"]["image_3"][:,::4,::4,:]
+    #Reverse Action Dim 1 
+    trajectory["action"] *= [1, -1, 1, 1, 1, 1, 1]
 
-    #Relabel random goals
-    traj_len = len(trajectory["action"])
-    rand = tf.random.uniform(shape=[traj_len])
-    low = tf.cast(tf.range(traj_len), dtype=tf.float32)
-    high = tf.ones_like(low) * tf.cast(traj_len, dtype=tf.float32)
-    goal_idxs = tf.cast((high-low) * rand + low, dtype=tf.int32)
-    goal_idxs = tf.minimum(goal_idxs, traj_len - 1)
+    return trajectory
 
-    trajectory["goal_image"] = tf.nest.map_structure(
-        lambda x: tf.gather(x, goal_idxs),
-        trajectory["observation"]["image"]
+
+def jaco_play_dataset_transform(trajectory, config) -> Dict[str, Any]:
+    #Set image key
+    image_keys = ['image', 'image_wrist']
+    if config['wrist_image_only']:
+        image_keys = ['image_wrist']
+    key = np.random.choice(image_keys)
+    
+    #Decode image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"][key])
+    
+    trajectory["observation"]["state_eef"] = trajectory["observation"][
+        "end_effector_cartesian_pos"
+    ][:, :6]
+    trajectory["observation"]["state_gripper"] = trajectory["observation"][
+        "end_effector_cartesian_pos"
+    ][:, -1:]
+
+    #Set action
+    trajectory["action"] = tf.concat(
+        (
+            trajectory["action"]["world_vector"],
+            tf.zeros_like(trajectory["action"]["world_vector"]),
+            trajectory["action"]["gripper_closedness_action"],
+        ),
+        axis=-1,
     )
-    trajectory["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - low
+
+    return trajectory
+
+
+def kuka_dataset_transform(trajectory, config) -> Dict[str, Any]:
+    #Decode image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"]["image"])
+    
+    #Set action
+    trajectory["action"] = tf.concat(
+        (
+            trajectory["action"]["world_vector"],
+            tf.zeros_like(trajectory["action"]["world_vector"]),
+            trajectory["action"]["gripper_closedness_action"],
+        ),
+        axis=-1,
+    )
+
+    return trajectory
+
+
+def taco_play_dataset_transform(trajectory, config):
+    #Set image key
+    image_keys = ['rgb_gripper', 'rgb_static']
+    if config['wrist_image_only']:
+        image_keys = ['rgb_static']
+    key = np.random.choice(image_keys) 
+
+    #Decode image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"][key])
+
+    #Set action
+    trajectory["action"] = trajectory["action"]["rel_actions_world"]
+
+    return trajectory
+
+
+def berkeley_cable_routing_dataset_transform(
+    trajectory,
+    config
+):
+    #Set image key
+    image_keys = ['image', 'top_image', 'wrist45_image']
+    if config['wrist_image_only']:
+        image_keys = ['wrist45_image']
+    key = np.random.choice(image_keys)
+
+    #Decode image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"][key])
+
+    #Set action
+    trajectory["action"] = tf.concat(
+        (
+            trajectory["action"]["world_vector"],
+            trajectory["action"]["rotation_delta"],
+            tf.zeros_like(trajectory["action"]["world_vector"][:, :1]),
+        ),
+        axis=-1,
+    )
+    return trajectory
+
+
+def roboturk_dataset_transform(trajectory, config):
+    #Decode image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"]["front_rgb"])
+
+    #Set action
+    trajectory["action"] = tf.concat(
+        (
+            trajectory["action"]["world_vector"],
+            trajectory["action"]["rotation_delta"],
+            trajectory["action"]["gripper_closedness_action"],
+        ),
+        axis=-1,
+    )
+    return trajectory
+
+
+def nyu_door_opening_dataset_transform(trajectory, config):
+    #Decode image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"]["image"])
+
+    #Set action
+    trajectory["action"] = tf.concat(
+    (    
+            trajectory["action"]["world_vector"],
+            trajectory["action"]["rotation_delta"],
+            trajectory["action"]["gripper_closedness_action"],
+        ),
+        axis=-1,
+    ) 
+    return trajectory
+
+
+def viola_dataset_transform(trajectory, config):
+    #Set image key
+    image_keys = ['agentview_rgb', 'eye_in_hand_rgb']
+    if config['wrist_image_only']:
+        image_keys = ['eye_in_hand_rgb']
+    key = np.random.choice(image_keys)
+
+    #Decode image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"][key])
+
+    #Set action
+    trajectory["action"] = tf.concat(
+        (
+            trajectory["action"]["world_vector"],
+            trajectory["action"]["rotation_delta"],
+            trajectory["action"]["gripper_closedness_action"][:, None],
+        ),
+        axis=-1,
+    )
+    return trajectory
+
+
+def berkeley_autolab_ur5_dataset_transform(trajectory, config):
+    #Set image key
+    image_keys = ['image', 'hand_image']
+    if config['wrist_image_only']:
+        image_keys = ['hand_image']
+    key = np.random.choice(image_keys)
+
+    #Decode image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"][key])
+
+    #Set action
+    trajectory["action"] = tf.concat(
+        (
+            trajectory["action"]["world_vector"],
+            trajectory["action"]["rotation_delta"],
+            trajectory["action"]["gripper_closedness_action"][:, None],
+        ),
+        axis=-1,
+    )
+    return trajectory
+
+def toto_dataset_transform(trajectory, config):
+    #Decode image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"]["image"])
+
+    #Set action
+    trajectory["action"] = tf.concat(
+        (
+            trajectory["action"]["world_vector"],
+            trajectory["action"]["rotation_delta"],
+            tf.cast(trajectory["action"]["open_gripper"][:, None], tf.float32),
+        ),
+        axis=-1,
+    )
+    return trajectory
+
+
+def rt1_dataset_transform(trajectory, config):
+    #Decode image
+    trajectory["observation"]["image"] = decode_images(trajectory["observation"]["image"])
+
+    #Set action
+    trajectory["action"] = tf.concat(
+        (
+            trajectory["action"]["world_vector"],
+            trajectory["action"]["rotation_delta"],
+            trajectory["action"]["gripper_closedness_action"],
+        ),
+        axis=-1,
+    )
     return trajectory
 
 
 RLDS_TRANSFORM_DICT = {
-    'gnm_dataset': gnm_dataset_transform_nodecode,
-    'polybot_dataset': polybot_dataset_transform_nodecode,
-    'bridge_dataset': bridge_dataset_transform_nodecode,
-    'r2_d2': r2d2_dataset_transform_nodecode
+    'gnm_dataset': gnm_dataset_transform,
+    'polybot_dataset': polybot_dataset_transform,
+    'bridge_dataset': bridge_dataset_transform,
+    'r2_d2': r2d2_dataset_transform,
+    'kuka': kuka_dataset_transform,
+    'fractal20220817_data': rt1_dataset_transform,
+    'jaco_play': jaco_play_dataset_transform,
+    'taco_play': taco_play_dataset_transform,
+    'berkeley_cable_routing': berkeley_cable_routing_dataset_transform,
+    'roboturk': roboturk_dataset_transform,
+    'nyu_door_opening_surprising_effectiveness': nyu_door_opening_dataset_transform,
+    'viola': viola_dataset_transform,
+    'berkeley_autolab_ur5': berkeley_autolab_ur5_dataset_transform,
+    'toto': toto_dataset_transform 
 }
 

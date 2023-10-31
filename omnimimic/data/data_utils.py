@@ -1,16 +1,62 @@
 from typing import Any, Callable, Dict, Sequence, Union
+from functools import partial
+import tensorflow as tf
 
 
-def unnormalize_action(action, metadata, key='action'):
-    action = map_nested_dict_index(
-            action,
-            key,
-            lambda x: tf.clip_by_value(2 * (x - metadata[key]["min"])
-                / (metadata[key]["max"] - metadata[key]["min"]) - 1,
-                -1,
-                1)
-        ) 
+def get_goal_idxs(traj_len, min_goal_distance=0):
+    rand = tf.random.uniform(shape=[traj_len])
+    low = tf.cast(tf.range(traj_len), dtype=tf.float32)
+    high = tf.ones_like(low + min_goal_distance) * tf.cast(traj_len, dtype=tf.float32)
+    goal_idxs = tf.cast((high-low) * rand + low, dtype=tf.int32)
+    goal_idxs = tf.minimum(goal_idxs, traj_len - 1)
+
+    return high, low, goal_idxs
+
+
+def unnormalize_action(action, metadata, key='action', eps=1e-9):
+    action_range = (metadata[key]["max"] - metadata[key]["min"] + eps) / 2
+    action = (action + 1) * action_range + metadata[key]["min"] - eps
+
     return action   
+
+
+def frame_map(map_fn, tensor):
+    tdataset = tf.data.Dataset.from_tensor_slices(tensor)
+    tdataset = tdataset.map(map_fn, num_parallel_calls=tf.data.AUTOTUNE).batch(
+                tf.dtypes.int64.max,
+                num_parallel_calls=tf.data.AUTOTUNE,
+                drop_remainder=False,
+            )
+    return tdataset.get_single_element()
+
+
+def decode_images(images):
+    if images.dtype == tf.uint8:
+        return images
+    images = frame_map(
+        partial(
+            tf.io.decode_image,
+            expand_animations=False
+        ), images
+    )
+    return images
+
+
+def decode_dataset_images(
+    x: Dict[str, Any], match: Union[str, Sequence[str]] = "image"
+) -> Dict[str, Any]:
+    if isinstance(match, str):
+        match = [match]
+
+    def match_fn(keypath, value):
+        image_in_keypath = any([s in keypath for s in match])
+        return image_in_keypath
+
+    return selective_tree_map(
+        x,
+        match=match_fn,
+        map_fn=partial(tf.io.decode_image, expand_animations=False),
+    )
 
 
 def selective_tree_map(
@@ -83,4 +129,5 @@ def map_nested_dict_index(d: Dict[str, Any], index: int, map_func):
             raise ValueError(f"Index {index} not found")
         d = d[i]
     d[indices[-1]] = map_func(d[indices[-1]])
+
 

@@ -2,7 +2,35 @@ import tensorflow as tf
 from .data_utils import *
 
 
-def normalize_obs_and_actions(traj, action_keys, metadata):
+def resize_image(traj, size=(64, 64)):
+    image_shape = tf.shape(traj["observation"]["image"])
+    if image_shape[1] == size[0] and image_shape[2] == size[1]:
+        return traj
+    traj["observation"]["image"] = tf.cast(traj["observation"]["image"], dtype='float32') / 255.0
+    traj["observation"]["image"] = tf.image.resize(traj["observation"]["image"],
+            size=size, method='bicubic')
+    traj["observation"]["image"] = tf.cast(traj["observation"]["image"] * 255.0, dtype='uint8')
+    return traj
+
+
+def relabel_goal_image(traj):
+    if 'goal_image' in traj.keys() and 'goal_distance_indices' in traj.keys():
+        return traj
+
+    #Relabel random goals
+    traj_len = tf.shape(traj["action"])[0]
+    high, low, goal_idxs = get_goal_idxs(traj_len)
+
+    traj["goal_image"] = tf.nest.map_structure(
+        lambda x: tf.gather(x, goal_idxs),
+        traj["observation"]["image"]
+    )
+
+    traj["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - low
+    return traj
+
+
+def normalize_obs_and_actions(traj, action_keys, metadata, eps=1e-9):
     '''
     For now, only normalize appropriate action keys
     '''
@@ -20,8 +48,8 @@ def normalize_obs_and_actions(traj, action_keys, metadata):
         map_nested_dict_index(
             traj,
             key,
-            lambda x: tf.clip_by_value(2 * (x - metadata[key]["min"])
-                / (metadata[key]["max"] - metadata[key]["min"]) - 1,
+            lambda x: tf.clip_by_value((2 * (x - metadata[key]["min"]) + eps)
+                / (metadata[key]["max"] - metadata[key]["min"] + eps) - 1,
                 -1,
                 1)
         )
@@ -104,13 +132,13 @@ def random_dataset_sequence_transform(traj, frame_stack, seq_length,
     return traj
 
 
-def process_batch_transform_v2(traj):
+def process_batch_transform_v2(traj, use_goal_state):
     new_traj = dict()
     new_traj['observation'] = dict()
     new_traj['observation']['image'] = traj['observation']['image']
     new_traj['goal_image'] = traj['goal_image']
-    #if 'goal_state' in traj.keys():
-    #    new_traj['goal_state'] = traj['goal_state']
+    if use_goal_state:
+        new_traj['goal_state'] = traj['goal_state']
     new_traj['goal_distance_indices'] = traj['goal_distance_indices']
     new_traj['action'] = tf.cast(traj['action'], dtype=tf.float32)
     return new_traj
