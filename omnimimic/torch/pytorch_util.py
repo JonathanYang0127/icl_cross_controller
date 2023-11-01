@@ -230,8 +230,10 @@ def set_gpu_mode(mode, gpu_ids=[0]):
     global _gpu_id
     _gpu_ids = gpu_ids
     _use_gpu = mode
-    device = torch.device("cuda:" + ",".join([str(x)
-        for x in gpu_ids]) if _use_gpu else "cpu")
+    print(torch.cuda.device_count())
+    #device = torch.device("cuda:" + ",".join([str(x)
+    #    for x in gpu_ids]) if _use_gpu else "cpu")
+    device='cuda'
 
 def gpu_enabled():
     return _use_gpu

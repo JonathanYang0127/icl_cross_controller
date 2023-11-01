@@ -2,13 +2,13 @@ import tensorflow as tf
 from .data_utils import *
 
 
-def resize_image(traj, size=(64, 64)):
+def resize_image(traj, size=(256, 256)):
     image_shape = tf.shape(traj["observation"]["image"])
     if image_shape[1] == size[0] and image_shape[2] == size[1]:
         return traj
     traj["observation"]["image"] = tf.cast(traj["observation"]["image"], dtype='float32') / 255.0
-    traj["observation"]["image"] = tf.image.resize(traj["observation"]["image"],
-            size=size, method='bicubic')
+    traj["observation"]["image"] = tf.image.resize_with_pad(traj["observation"]["image"],
+            size[0], size[1], method='bicubic')
     traj["observation"]["image"] = tf.cast(traj["observation"]["image"] * 255.0, dtype='uint8')
     return traj
 

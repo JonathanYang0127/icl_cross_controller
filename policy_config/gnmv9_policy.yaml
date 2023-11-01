@@ -4,7 +4,7 @@ run_name: base-vint-4x4-0c
 # training setup
 use_wandb: True # set to false if you don't want to log to wandb
 train: True
-batch_size: 256
+batch_size: 128 # 1000
 batch_size_val: 64
 epochs: 100
 gpu_ids: [5, 6, 7]

@@ -25,7 +25,10 @@ def apply_common_transforms(dataset, config,
     obs_action_metadata=None):
     #Resize image
     dataset = dataset.map(
-        resize_image,
+        partial(
+            resize_image,
+            size=config['image_size'],
+        ),
         num_parallel_calls=tf.data.AUTOTUNE
     )
 
@@ -122,7 +125,7 @@ def make_dataloader(dataset_name, split, dataloader_config, data_dir=None):
         )
     '''
     dataloader = dl.DLataset.from_rlds(builder, split=split, shuffle=True,
-        num_parallel_reads=6)
+        num_parallel_reads=16)
     #dataloader = decode_dataloader(dataloader)
     if dataset_name in RLDS_TRANSFORM_DICT.keys():
         dataloader = dataloader.map(partial(

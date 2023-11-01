@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     TFDS_DATA_DIR = '/iris/u/jyang27/rlds_data'
-    #datasets = list(DATASET_SPLITS.keys())[:3]
+    datasets = list(DATASET_SPLITS.keys())[:3]
     #n_datasets = len(datasets)
-    datasets = ['taco_play']
+    #datasets = ['taco_play']
     train_dataloaders, val_dataloaders, val_metadata = [], [], []
     config = {'wrist_image_only': True,
               'seq_length': 5,
@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
         #Interleave train dataloaders
         sample_weights = [DATASET_SPLITS[d] for d in datasets]
-        print(sample_weights)
+        print(datasets, sample_weights)
         sample_weights /= tf.reduce_sum(sample_weights)
         train_dataloader = tf.data.Dataset.sample_from_datasets(
             train_dataloaders, sample_weights)

@@ -1,8 +1,8 @@
 DATASET_SPLITS = {
-    'gnm_dataset': 30.0,
-    'polybot_dataset': 0.1,
-    'bridge_dataset': 4.0,
-    'r2_d2': 4.0,
+    #'gnm_dataset': 30.0,
+    #'polybot_dataset': 0.1,
+    #'bridge_dataset': 4.0,
+    #'r2_d2': 4.0,
     "fractal20220817_data": 1.0,
     #"kuka": 0.1,
     "taco_play": 2.0,

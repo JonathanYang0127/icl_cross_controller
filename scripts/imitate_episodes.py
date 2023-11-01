@@ -3,6 +3,7 @@ import numpy as np
 import os
 os.environ['WANDB_API_KEY'] = '6bc5ed6cff29e874c30c04f4a29faae7ae603964' 
 os.environ['WANDB_ENTITY'] = 'jyang27'
+os.environ["WANDB__SERVICE_WAIT"] = "300"
 import pickle
 import argparse
 import matplotlib.pyplot as plt
@@ -18,7 +19,7 @@ from datetime import datetime
 from typing import Any, Dict
 from functools import partial
 
-from omnimimic.policies import GCConvPolicy, ACTPolicy, GNMPolicy
+from omnimimic.policies import GCConvPolicy, ACTPolicy, GNMPolicy, GNMNumpyWrapper
 from omnimimic.data.dataset import *
 from omnimimic.data.data_splits import DATASET_SPLITS
 from omnimimic.train_utils.visualize_utils import (visualize_obs_action,
@@ -88,11 +89,10 @@ def main(args):
             print(list(difference)) 
             policy.load_state_dict(state_dict, strict=False)
     policy.to(ptu.device)
-    if len(gpu_ids) > 1:
-        policy = torch.nn.DataParallel(policy, device_ids=gpu_ids)
 
     batch_size_train = policy_config['batch_size']
     batch_size_val = policy_config['batch_size_val']
+    print(batch_size_train)
     print(count_parameters(policy))
     lr = policy_config['lr']
 
@@ -103,15 +103,22 @@ def main(args):
     if 'all' in val_datasets:
         val_datasets = list(DATASET_SPLITS.keys())
     n_datasets = len(datasets)
+    if 'efficientnet' in policy_config['obs_encoder']:
+        from efficientnet_pytorch import EfficientNet
+        image_size=EfficientNet.get_image_size(policy_config['obs_encoder'])
+    else:
+        image_size=(policy_config['input_height'], policy_config['input_width'])
+    print(image_size)
     train_dataloaders, val_dataloaders, val_metadata = [], [], []
     config = {'wrist_image_only': args['wrist_only'], 
               'seq_length': policy_config['len_traj_pred'], 
               'visualize': not args['no_visualization'],
-              'no_normalization': args['no_normalization']}
+              'no_normalization': args['no_normalization'],
+              'image_size': (image_size, image_size)}
     with tf.device('/cpu'):
         for dataset in datasets:
             if dataset in val_datasets:
-                train_split='train[:95%]'
+                train_split='train'#[:95%]'
             else:
                 train_split = 'train'
             train_dataloader, _ = make_dataloader(dataset, train_split, config, 
@@ -119,7 +126,7 @@ def main(args):
             train_dataloaders.append(train_dataloader)
 
             if dataset in val_datasets:
-                val_dataloader, val_meta = make_dataloader(dataset, 'train[5%:]', config,
+                val_dataloader, val_meta = make_dataloader(dataset, 'train[:5%]', config,
                     data_dir=TFDS_DATA_DIR)
                 val_dataloader = shuffle_batch_and_prefetch_dataloader(val_dataloader,
                         batch_size_val)
@@ -152,6 +159,7 @@ def main(args):
         #'state_dim': state_dim,
         'lr': lr,
         'policy_class': policy_class,
+        'gpu_ids': gpu_ids,
         #'onscreen_render': onscreen_render,
         'policy': policy,
         #'task_name': task_name,
@@ -170,6 +178,7 @@ def main(args):
     run_name = run_name + '_'.join(datasets)
     logger = wandb.init(
         name=run_name,
+        settings=wandb.Settings(_service_wait=300),
         config={'train_config':{key: value for key, value 
                 in train_config.items() if key != 'policy'}, 
                 'policy_config': policy_config}
@@ -205,13 +214,19 @@ def train_bc(train_dataloader, val_dataloaders, val_metadata, train_config, logg
     seed = train_config['seed']
     num_trains_per_train_loop = train_config['num_trains_per_train_loop']
     num_vals_per_val_loop = train_config['num_vals_per_val_loop']
+    gpu_ids = train_config['gpu_ids']
 
     policy_class = train_config['policy_class']
     policy = train_config['policy']
     policy.train() 
- 
+
     optimizer, scheduler = make_optimizer(policy_class, policy)
-  
+
+    if len(gpu_ids) > 1:
+        gpu_ids = [int(i) for i in gpu_ids]
+        policy = torch.nn.DataParallel(policy, device_ids=gpu_ids)
+    policy = GNMNumpyWrapper(policy)
+
     train_iterator = train_dataloader.as_numpy_iterator()
     val_iterators = [d.as_numpy_iterator() for d in val_dataloaders]
 

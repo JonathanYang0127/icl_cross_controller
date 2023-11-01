@@ -1,6 +1,6 @@
 from .convnet_policy import GCConvPolicy
 from .act_policy import ACTPolicy
-from .gnm_policy import GNMPolicy
+from .gnm_policy import GNMPolicy, GNMNumpyWrapper
 
 def make_policy(policy_class, policy_config):
     if policy_class == 'ACT':
