@@ -4,7 +4,7 @@ run_name: base-vint-4x4-0c
 # training setup
 use_wandb: True # set to false if you don't want to log to wandb
 train: True
-batch_size: 128 # 1000
+batch_size: 64 # 1000
 batch_size_val: 64
 epochs: 100
 gpu_ids: [5, 6, 7]
@@ -27,8 +27,8 @@ model_type: gnm_v9_sa
 obs_encoder: "efficientnet-b3" # by default, this is imagenet pretrained
 goal_encoder: "efficientnet-b3"
 goal_embedding_size: null # goal_clip_embd.shape[1]
-input_width: 64
-input_height: 64
+input_width: 128
+input_height: 128
 obs_encoding_size: 512
 goal_encoding_size: 512
 freeze_obs_encoder: False

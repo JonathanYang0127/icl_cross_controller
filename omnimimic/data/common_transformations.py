@@ -10,23 +10,25 @@ def resize_image(traj, size=(256, 256)):
     traj["observation"]["image"] = tf.image.resize_with_pad(traj["observation"]["image"],
             size[0], size[1], method='bicubic')
     traj["observation"]["image"] = tf.cast(traj["observation"]["image"] * 255.0, dtype='uint8')
+
     return traj
 
 
 def relabel_goal_image(traj):
-    if 'goal_image' in traj.keys() and 'goal_distance_indices' in traj.keys():
-        return traj
-
     #Relabel random goals
     traj_len = tf.shape(traj["action"])[0]
     high, low, goal_idxs = get_goal_idxs(traj_len)
+
+    if 'goal_idxs' in traj.keys() and 'goal_distance_indices' in traj.keys():
+        goal_idxs = traj['goal_idxs']
+    else:
+        traj["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - low
 
     traj["goal_image"] = tf.nest.map_structure(
         lambda x: tf.gather(x, goal_idxs),
         traj["observation"]["image"]
     )
 
-    traj["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - low
     return traj
 
 

@@ -13,13 +13,12 @@ from tqdm import tqdm
 import yaml
 import tensorflow as tf
 import tensorflow_datasets as tfds
-import rlds
 import time
 from datetime import datetime
 from typing import Any, Dict
 from functools import partial
 
-from omnimimic.policies import GCConvPolicy, ACTPolicy, GNMPolicy, GNMNumpyWrapper
+from omnimimic.policies import *
 from omnimimic.data.dataset import *
 from omnimimic.data.data_splits import DATASET_SPLITS
 from omnimimic.train_utils.visualize_utils import (visualize_obs_action,
@@ -42,15 +41,6 @@ def count_parameters(model):
         total_params+=params
     print(f"Total Trainable Params: {total_params/1e6:.2f}M")
     return total_params
-
-def make_policy(policy_class, policy_config):
-    if policy_class == 'ACT':
-        policy = ACTPolicy(**policy_config)
-    elif policy_class == 'ConvNet':
-        policy = GCConvPolicy(**policy_config)
-    elif policy_class == 'GNM':
-        policy = GNMPolicy(**policy_config)
-    return policy
 
 def make_optimizer(policy_class, policy):
     return policy.configure_optimizers()
@@ -103,18 +93,13 @@ def main(args):
     if 'all' in val_datasets:
         val_datasets = list(DATASET_SPLITS.keys())
     n_datasets = len(datasets)
-    if 'efficientnet' in policy_config['obs_encoder']:
-        from efficientnet_pytorch import EfficientNet
-        image_size=EfficientNet.get_image_size(policy_config['obs_encoder'])
-    else:
-        image_size=(policy_config['input_height'], policy_config['input_width'])
-    print(image_size)
+    image_size=(policy_config['input_height'], policy_config['input_width'])
     train_dataloaders, val_dataloaders, val_metadata = [], [], []
     config = {'wrist_image_only': args['wrist_only'], 
               'seq_length': policy_config['len_traj_pred'], 
               'visualize': not args['no_visualization'],
               'no_normalization': args['no_normalization'],
-              'image_size': (image_size, image_size)}
+              'image_size': image_size}
     with tf.device('/cpu'):
         for dataset in datasets:
             if dataset in val_datasets:
@@ -225,7 +210,8 @@ def train_bc(train_dataloader, val_dataloaders, val_metadata, train_config, logg
     if len(gpu_ids) > 1:
         gpu_ids = [int(i) for i in gpu_ids]
         policy = torch.nn.DataParallel(policy, device_ids=gpu_ids)
-    policy = GNMNumpyWrapper(policy)
+    wrapper = get_numpy_wrapper(policy_class)
+    policy = wrapper(policy)
 
     train_iterator = train_dataloader.as_numpy_iterator()
     val_iterators = [d.as_numpy_iterator() for d in val_dataloaders]
@@ -240,6 +226,7 @@ def train_bc(train_dataloader, val_dataloaders, val_metadata, train_config, logg
             batch = next(train_iterator)
             obs = batch['observation']['image']
             goal_image = batch['goal_image']
+            print(goal_image.shape)
             action = batch['action']
             goal_distances = batch['goal_distance_indices'] 
             goal_state = batch.get('goal_state', None)
@@ -302,7 +289,7 @@ def train_bc(train_dataloader, val_dataloaders, val_metadata, train_config, logg
                 os.makedirs(checkpoint_dir)
             ckpt_path = os.path.join(checkpoint_dir, f'policy_epoch_{epoch}_seed_{seed}.ckpt')
             print(f"Saving checkpoints in {ckpt_path}")
-            torch.save(policy.state_dict(), ckpt_path)
+            torch.save(policy.policy.state_dict(), ckpt_path)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

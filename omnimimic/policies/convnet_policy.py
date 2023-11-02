@@ -308,6 +308,13 @@ class GaussianCNNPolicy(CNN):
             self.log_std = np.log(std)
             assert LOG_SIG_MIN <= self.log_std <= LOG_SIG_MAX
 
+        self.lr = kwargs['lr']
+        self.optimizer = torch.optim.Adam(
+            self.parameters(),
+            lr=self.lr
+        )
+
+
     def forward(self, obs, extra_fc_input=None, intermediate_output_layer=-1):
         if intermediate_output_layer == -1:
             h = super().forward(obs, extra_fc_input=extra_fc_input, return_last_activations=True)
@@ -337,16 +344,13 @@ class GaussianCNNPolicy(CNN):
             return Independent(Normal(mean, std), 1), intermediate_output
 
 
-class GCConvPolicy(GaussianCNNPolicy, BaseTorchPolicy):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.lr = kwargs['lr']
-        self.no_goal = kwargs.get('no_goal', False)
-    
-        self.optimizer = torch.optim.Adam(
-            self.parameters(),
-            lr=self.lr
-        )
+    def configure_optimizers(self):
+        return self.optimizer, None
+
+
+class GCConvPolicyWrapper:
+    def __init__(self, policy):
+        self.policy = policy
 
     def forward_np(self, image, goal_image, task_embedding=None):
         '''
@@ -367,7 +371,7 @@ class GCConvPolicy(GaussianCNNPolicy, BaseTorchPolicy):
         else:
             image_data = torch.einsum('b h w c -> b c h w', image)
 
-        return super().forward(image_data, extra_fc_input=task_embedding)
+        return self.policy(image_data, extra_fc_input=task_embedding)
 
     def get_action(self, image, goal_image, task_embedding=None):
         dist = self.forward_np(image, goal_image, task_embedding)
@@ -386,8 +390,6 @@ class GCConvPolicy(GaussianCNNPolicy, BaseTorchPolicy):
 
         return {'loss': policy_loss, 'mse_loss': mse_loss}
 
-    def configure_optimizers(self):
-        return self.optimizer, None
 
 class RandomCrop:
     """
