@@ -3,12 +3,17 @@ from functools import partial
 import tensorflow as tf
 
 
-def get_goal_idxs(traj_len, min_goal_distance=0):
+def get_goal_idxs(traj_len, min_goal_distance_prop=0.2, max_goal_distance_prop=0.8):
     rand = tf.random.uniform(shape=[traj_len])
-    low = tf.cast(tf.range(traj_len), dtype=tf.float32)
-    high = tf.ones_like(low + min_goal_distance) * tf.cast(traj_len, dtype=tf.float32)
+    low = tf.cast(tf.range(traj_len), dtype=tf.float32) + tf.cast(traj_len, dtype=tf.float32) * min_goal_distance_prop
+    high = tf.cast(tf.range(traj_len), dtype=tf.float32) + tf.cast(traj_len, dtype=tf.float32) * max_goal_distance_prop
     goal_idxs = tf.cast((high-low) * rand + low, dtype=tf.int32)
+    goal_idxs = tf.maximum(goal_idxs, tf.range(traj_len))
     goal_idxs = tf.minimum(goal_idxs, traj_len - 1)
+    low = tf.cast(low, dtype=tf.int32)
+    low = tf.maximum(low, tf.range(traj_len))
+    high = tf.cast(high, dtype=tf.int32)
+    high = tf.minimum(high, traj_len - 1)
 
     return high, low, goal_idxs
 

@@ -7,8 +7,9 @@ def resize_image(traj, size=(256, 256)):
     if image_shape[1] == size[0] and image_shape[2] == size[1]:
         return traj
     traj["observation"]["image"] = tf.cast(traj["observation"]["image"], dtype='float32') / 255.0
-    traj["observation"]["image"] = tf.image.resize_with_pad(traj["observation"]["image"],
-            size[0], size[1], method='bicubic')
+#    traj["observation"]["image"] = tf.image.resize_with_pad(traj["observation"]["image"],
+#            size[0], size[1], method='bicubic')
+    traj["observation"]["image"] = tf.image.resize(traj["observation"]["image"], size, method='bicubic')
     traj["observation"]["image"] = tf.cast(traj["observation"]["image"] * 255.0, dtype='uint8')
 
     return traj
@@ -22,7 +23,8 @@ def relabel_goal_image(traj):
     if 'goal_idxs' in traj.keys() and 'goal_distance_indices' in traj.keys():
         goal_idxs = traj['goal_idxs']
     else:
-        traj["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - low
+        traj['goal_idxs'] = goal_idxs
+        traj["goal_distance_indices"] = tf.cast(goal_idxs - low, tf.float32) 
 
     traj["goal_image"] = tf.nest.map_structure(
         lambda x: tf.gather(x, goal_idxs),
@@ -142,6 +144,7 @@ def process_batch_transform_v2(traj, use_goal_state):
     if use_goal_state:
         new_traj['goal_state'] = traj['goal_state']
     new_traj['goal_distance_indices'] = traj['goal_distance_indices']
+    new_traj['goal_idxs'] = traj['goal_idxs']
     new_traj['action'] = tf.cast(traj['action'], dtype=tf.float32)
     return new_traj
 

@@ -4,6 +4,7 @@ from functools import partial
 from .rlds_data_transforms import RLDS_TRANSFORM_DICT
 from .common_transformations import *
 from .data_utils import *
+from .data_splits import VERSION_DICT
 from tqdm import tqdm
 import dlimp as dl
 import numpy as np
@@ -116,7 +117,11 @@ def get_obs_action_metadata(
 
 
 def make_dataloader(dataset_name, split, dataloader_config, data_dir=None):
-    builder = tfds.builder(dataset_name, data_dir=data_dir)
+    dataset_name_and_version = dataset_name
+    if dataset_name in VERSION_DICT.keys():
+        dataset_name_and_version = dataset_name + ':' + VERSION_DICT[dataset_name]
+    print(dataset_name_and_version)
+    builder = tfds.builder(dataset_name_and_version, data_dir=data_dir)
     '''
     dataset = builder.as_dataset(
             split=split,
@@ -125,7 +130,7 @@ def make_dataloader(dataset_name, split, dataloader_config, data_dir=None):
         )
     '''
     dataloader = dl.DLataset.from_rlds(builder, split=split, shuffle=True,
-        num_parallel_reads=16)
+        num_parallel_reads=12)
     #dataloader = decode_dataloader(dataloader)
     if dataset_name in RLDS_TRANSFORM_DICT.keys():
         dataloader = dataloader.map(partial(
@@ -146,7 +151,7 @@ def make_dataloader(dataset_name, split, dataloader_config, data_dir=None):
             obs_action_metadata=metadata)
     #Ensure observations are not 0
     dataloader = dataloader.filter(lambda e:
-        tf.math.reduce_mean(e['observation']['image']) > 0)
+        tf.math.reduce_mean(e['observation']['image'][0]) > 0)
     dataloader = dataloader.flat_map(lambda e: tf.data.Dataset.from_tensor_slices(e))
     dataloader = dataloader.repeat()
     
