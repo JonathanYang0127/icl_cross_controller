@@ -35,7 +35,10 @@ def apply_common_transforms(dataset, config,
 
     #Relabel goals
     dataset = dataset.map(
-        relabel_goal_image,
+        partial(
+            relabel_goal_image,
+            metadata=obs_action_metadata
+        ),
         num_parallel_calls=tf.data.AUTOTUNE
     )
 
@@ -94,11 +97,13 @@ def get_obs_action_metadata(
 
         i, n_samples = 0, 1000
         dataset_iter = dataset.repeat().as_numpy_iterator()
+        traj_len_metadata = []
         for _ in tqdm(range(n_samples)):
             episode = next(dataset_iter)
             i = i + 1
             for key in keys:
                 eps_by_key[key].append(index_nested_dict(episode, key))
+            traj_len_metadata.append(episode['action'].shape[0])
         eps_by_key = {key: np.concatenate(values) for key, values in eps_by_key.items()}
 
         metadata = {}
@@ -109,6 +114,7 @@ def get_obs_action_metadata(
                 "max": eps_by_key[key].max(0),
                 "min": eps_by_key[key].min(0),
             }
+        metadata['traj_len'] = np.mean(traj_len_metadata)
         with tf.io.gfile.GFile(path, "wb") as f:
             pickle.dump(metadata, f)
         print("Done!")
@@ -116,7 +122,7 @@ def get_obs_action_metadata(
     return metadata
 
 
-def make_dataloader(dataset_name, split, dataloader_config, data_dir=None):
+def make_dataloader(dataset_name, split, dataloader_config, data_dir=None, validation=False):
     dataset_name_and_version = dataset_name
     if dataset_name in VERSION_DICT.keys():
         dataset_name_and_version = dataset_name + ':' + VERSION_DICT[dataset_name]
@@ -144,7 +150,7 @@ def make_dataloader(dataset_name, split, dataloader_config, data_dir=None):
         builder,
         dataloader,
         action_keys,
-        load_if_exists=True,
+        load_if_exists=False or validation,
     )
     print(f'{dataset_name}: {metadata}')
     dataloader = apply_common_transforms(dataloader, dataloader_config, 

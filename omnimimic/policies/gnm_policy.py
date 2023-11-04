@@ -169,6 +169,8 @@ class GNMNumpyWrapper:
 
     def compute_loss_np(self, image, goal_image, actions, goal_distances, task_embedding=None):
         distance_pred, action_pred = self.forward_np(image, goal_image, task_embedding)
+
+        #Use action_pred device for data parallelism
         actions = torch.from_numpy(actions).to(action_pred.device)
         '''        
         b_size = image.shape[0]
@@ -184,17 +186,22 @@ class GNMNumpyWrapper:
         gnm_action_pred = action_pred[:, :, 1:3]
         gnm_actions = actions[:, :, 1:3]
 
-        goal_distances = torch.from_numpy(goal_distances).to(action_pred.device)
+        #Compute MSE Loss
         mse_loss = F.mse_loss(action_pred.float(), actions.float(), reduction="none").mean()
-        loss = mse_loss
 
         similarity = torch.nn.CosineSimilarity(dim=-1, eps=1e-08)
         similarity_score = similarity(gnm_action_pred, gnm_actions).mean()
 
         l1_loss = F.l1_loss(action_pred.float(), actions.float(), reduction="none").mean()
 
+        #Compute Distance Loss
+        goal_distances = torch.from_numpy(goal_distances).to(action_pred.device)
+        goal_distance_loss = F.mse_loss(distance_pred.float(), goal_distances.reshape(-1, 1).float(), reduction="none").mean() 
+
+        loss = mse_loss + goal_distance_loss
         return {'loss': loss, 'mse_loss': mse_loss, 
                 'l1_loss': l1_loss,
+                'goal_distance_loss': goal_distance_loss,
                 'action_pred': original_action_pred, 
                 'action_cosine_similarity': similarity_score}
 

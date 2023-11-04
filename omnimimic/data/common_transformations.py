@@ -15,7 +15,7 @@ def resize_image(traj, size=(256, 256)):
     return traj
 
 
-def relabel_goal_image(traj):
+def relabel_goal_image(traj, metadata):
     #Relabel random goals
     traj_len = tf.shape(traj["action"])[0]
     high, low, goal_idxs = get_goal_idxs(traj_len)
@@ -30,6 +30,9 @@ def relabel_goal_image(traj):
         lambda x: tf.gather(x, goal_idxs),
         traj["observation"]["image"]
     )
+    traj["goal_distance_indices"] = traj["goal_distance_indices"]
+    if metadata is not None:
+        traj["goal_distance_indices"] /= tf.cast(metadata['traj_len'], tf.float32)
 
     return traj
 

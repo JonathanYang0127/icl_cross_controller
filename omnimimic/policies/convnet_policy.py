@@ -351,6 +351,7 @@ class GaussianCNNPolicy(CNN):
 class GCConvPolicyWrapper:
     def __init__(self, policy):
         self.policy = policy
+        self.no_goal = False
 
     def forward_np(self, image, goal_image, task_embedding=None):
         '''
@@ -378,7 +379,7 @@ class GCConvPolicyWrapper:
         action = dist.mean
         return action.detach().cpu().numpy()
 
-    def compute_loss_np(self, image, goal_image, actions, task_embedding=None):
+    def compute_loss_np(self, image, goal_image, actions, goal_distances, task_embedding=None):
         dist = self.forward_np(image, goal_image, task_embedding)
         actions = torch.from_numpy(actions).to(ptu.device)
 

@@ -67,9 +67,8 @@ def gnm_dataset_transform(
     normalization_factor = tf.cast(normalization_factor, tf.float64)
     trajectory["action_sequence"] /= normalization_factor
     
-    '''
     #Relabel random goals
-    high, low, goal_idxs = get_goal_idxs(traj_len, min_goal_distance=min_goal_distance)
+    high, low, goal_idxs = get_goal_idxs(traj_len)
     trajectory["goal_image"] = tf.nest.map_structure(
         lambda x: tf.gather(x, goal_idxs),
         trajectory["observation"]["image"]
@@ -78,14 +77,14 @@ def gnm_dataset_transform(
         lambda x: tf.gather(x, goal_idxs),
         trajectory["observation"]["state"]
         )[:, :2]
-    '''
     trajectory["goal_idxs"] = goal_idxs
     trajectory["goal_state"] -= trajectory['observation']['state'][:traj_len, :2]
     trajectory["goal_state"] = tf.expand_dims(trajectory["goal_state"], 1)
     trajectory["goal_state"] = tf.squeeze(tf.linalg.matmul(trajectory["goal_state"],
         trajectory['observation']['yaw_rotmat'][:, :2, :2]), 1)
     trajectory["goal_state"] /= normalization_factor
-    trajectory["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - low
+    trajectory["goal_distance_indices"] = tf.cast(goal_idxs - low, tf.float32) 
+    
     return trajectory
 
 
@@ -119,7 +118,7 @@ def polybot_dataset_transform(
     #    trajectory["goal_pose"][:, :3] - trajectory["observation"]["cartesian_pose"][:, :3],
     #    dim=-1
     #)
-    trajectory["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - low
+    trajectory["goal_distance_indices"] = tf.cast(goal_idxs - low, tf.float32) 
     return trajectory
 
 
