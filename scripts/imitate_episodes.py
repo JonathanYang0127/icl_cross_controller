@@ -83,7 +83,7 @@ def main(args):
     batch_size_train = policy_config['batch_size']
     batch_size_val = policy_config['batch_size_val']
     print(batch_size_train)
-    print(count_parameters(policy))
+    print("Num policy parameters:", count_parameters(policy))
     lr = policy_config['lr']
 
     #Define Dataloaders
@@ -111,10 +111,15 @@ def main(args):
             train_dataloaders.append(train_dataloader)
 
             if dataset in val_datasets:
-                val_dataloader, val_meta = make_dataloader(dataset, 'train[:5%]', config,
-                    data_dir=TFDS_DATA_DIR)
+                splits = ['train[:1%]', 'train[20%:21%]', 'train[40%:41%]', 'train[60%:61%]', 'train[80%:81%]']
+                val_dataloader_splits = []
+                for split in splits:
+                    val_split, val_meta = make_dataloader(dataset, split, config,
+                        data_dir=TFDS_DATA_DIR, validation=True)
+                    val_dataloader_splits.append(val_split)
+                val_dataloader = tf.data.Dataset.sample_from_datasets(val_dataloader_splits)
                 val_dataloader = shuffle_batch_and_prefetch_dataloader(val_dataloader,
-                        batch_size_val)
+                     batch_size_val)
                 val_dataloaders.append(val_dataloader)
                 val_metadata.append(val_meta)
 
@@ -226,7 +231,6 @@ def train_bc(train_dataloader, val_dataloaders, val_metadata, train_config, logg
             batch = next(train_iterator)
             obs = batch['observation']['image']
             goal_image = batch['goal_image']
-            print(goal_image.shape)
             action = batch['action']
             goal_distances = batch['goal_distance_indices'] 
             goal_state = batch.get('goal_state', None)

@@ -87,10 +87,17 @@ def get_obs_action_metadata(
     )
 
     # check if stats already exist and load, otherwise compute
-    if tf.io.gfile.exists(path) and load_if_exists:
+    all_keys_present = True
+    path_exists = tf.io.gfile.exists(path)
+    if path_exists and load_if_exists:
         print(f"Loading existing statistics for normalization from {path}.")
         with tf.io.gfile.GFile(path, "rb") as f:
             metadata = pickle.load(f)
+        for key in keys:
+            all_keys_present = (key in metadata.keys()) and all_keys_present
+        all_keys_present = 'traj_len' in metadata.keys() and all_keys_present
+    if load_if_exists and path_exists and all_keys_present:
+        return metadata
     else:
         print("Computing obs/action statistics for normalization...")
         eps_by_key = {key: [] for key in keys}
@@ -114,7 +121,8 @@ def get_obs_action_metadata(
                 "max": eps_by_key[key].max(0),
                 "min": eps_by_key[key].min(0),
             }
-        metadata['traj_len'] = np.mean(traj_len_metadata)
+        metadata['traj_len'] = np.max(traj_len_metadata)
+        print(metadata['traj_len'])
         with tf.io.gfile.GFile(path, "wb") as f:
             pickle.dump(metadata, f)
         print("Done!")

@@ -24,13 +24,12 @@ def relabel_goal_image(traj, metadata):
         goal_idxs = traj['goal_idxs']
     else:
         traj['goal_idxs'] = goal_idxs
-        traj["goal_distance_indices"] = tf.cast(goal_idxs - low, tf.float32) 
+        traj["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - tf.cast(tf.range(traj_len), tf.float32)
 
     traj["goal_image"] = tf.nest.map_structure(
         lambda x: tf.gather(x, goal_idxs),
         traj["observation"]["image"]
     )
-    traj["goal_distance_indices"] = traj["goal_distance_indices"]
     if metadata is not None:
         traj["goal_distance_indices"] /= tf.cast(metadata['traj_len'], tf.float32)
 
@@ -73,10 +72,6 @@ def random_dataset_sequence_transform_v2(traj, frame_stack, seq_length,
     if 'action_sequence' in traj.keys():
         traj_len = tf.shape(traj["action"])[0]
         traj['action'] = traj['action_sequence']
-        traj['observation']['image'] = traj['observation']['image']
-        for k in traj.keys():
-            if 'goal' in k:    
-                traj[k] = traj[k]
         return traj
 
     traj_len = tf.shape(traj["action"])[0]

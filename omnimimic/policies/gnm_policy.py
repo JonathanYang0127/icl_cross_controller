@@ -190,7 +190,7 @@ class GNMNumpyWrapper:
         mse_loss = F.mse_loss(action_pred.float(), actions.float(), reduction="none").mean()
 
         similarity = torch.nn.CosineSimilarity(dim=-1, eps=1e-08)
-        similarity_score = similarity(gnm_action_pred, gnm_actions).mean()
+        similarity_score = similarity(action_pred, actions).mean()
 
         l1_loss = F.l1_loss(action_pred.float(), actions.float(), reduction="none").mean()
 

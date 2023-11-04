@@ -68,7 +68,7 @@ def gnm_dataset_transform(
     trajectory["action_sequence"] /= normalization_factor
     
     #Relabel random goals
-    high, low, goal_idxs = get_goal_idxs(traj_len)
+    high, low, goal_idxs = get_goal_idxs(traj_len, min_goal_distance_prop=0.05, max_goal_distance_prop=0.5)
     trajectory["goal_image"] = tf.nest.map_structure(
         lambda x: tf.gather(x, goal_idxs),
         trajectory["observation"]["image"]
@@ -83,7 +83,7 @@ def gnm_dataset_transform(
     trajectory["goal_state"] = tf.squeeze(tf.linalg.matmul(trajectory["goal_state"],
         trajectory['observation']['yaw_rotmat'][:, :2, :2]), 1)
     trajectory["goal_state"] /= normalization_factor
-    trajectory["goal_distance_indices"] = tf.cast(goal_idxs - low, tf.float32) 
+    trajectory["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - tf.cast(tf.range(traj_len), tf.float32) 
     
     return trajectory
 
