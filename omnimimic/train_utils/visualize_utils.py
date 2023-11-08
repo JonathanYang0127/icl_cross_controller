@@ -61,10 +61,12 @@ def visualize_goal_reaching_plots(obs_image, goal_image, goal_state, action, los
         goal_pos = goal_state[i][:2]
         pred_waypoints = loss_dict[action_pred_key][i]
         gt_waypoints = action[i]
-        if not no_normalization:
+        if not no_normalization or discrete:
             pred_waypoints = unnormalize_action(pred_waypoints, 
+                    metadata,
                     discrete=discrete, num_bins=num_bins)
             gt_waypoints = unnormalize_action(gt_waypoints, 
+                    metadata,
                     discrete=discrete, num_bins=num_bins)
         pred_waypoints = pred_waypoints[:, 2:0:-1]
         gt_waypoints = gt_waypoints[:, 2:0:-1]

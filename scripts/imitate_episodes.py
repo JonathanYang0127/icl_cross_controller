@@ -151,7 +151,7 @@ def main(args):
     #Define Train Config
     train_config = {
         'num_trains_per_train_loop': 1000,
-        'num_vals_per_val_loop': 100,
+        'num_vals_per_val_loop': 64,
         'train_datasets': datasets,
         'val_datasets': val_datasets,
         'num_epochs': num_epochs,
@@ -188,10 +188,17 @@ def main(args):
     )
     train_bc(train_dataloader, val_dataloaders, val_metadata, train_config, logger)
 
-def compute_dict_mean(epoch_dicts):
+def compute_dict_mean(epoch_dicts, ignore=['action_pred']):
     result = {k: None for k in epoch_dicts[0]}
     num_items = len(epoch_dicts)
     for k in result:
+        skip = False
+        for i_key in ignore:
+            if i_key in k:
+                skip = True
+                break
+        if skip:
+            continue
         value_sum = 0
         for epoch_dict in epoch_dicts:
             value_sum += epoch_dict[k].mean(dim=0)
@@ -246,7 +253,7 @@ def train_bc(train_dataloader, val_dataloaders, val_metadata, train_config, logg
             action = batch['action']
             goal_distances = batch['goal_distance_indices'] 
             goal_state = batch.get('goal_state', None)
-            print(batch['dataset_idx'])
+            #print(batch['dataset_idx'])
 
             loss_dict = policy.compute_loss_np(obs, goal_image, action, goal_distances, task_embedding=None)
             loss = loss_dict['loss']

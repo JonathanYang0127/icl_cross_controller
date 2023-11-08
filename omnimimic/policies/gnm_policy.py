@@ -187,7 +187,6 @@ class GNMNumpyWrapper:
             ), axis=-1) 
         actions = actions * 4
         '''
-        original_action_pred = action_pred
 
         if self.policy.discrete:   
             #Compute CE Loss
@@ -197,10 +196,11 @@ class GNMNumpyWrapper:
             goal_distance_loss = F.mse_loss(distance_pred, goal_distances, reduction="none").mean()
 
             loss = ce_loss# + goal_distance_loss
+            action_pred = self.sample_action(distance_pred, action_pred)
             return {'loss': loss, 
                     'ce_loss': ce_loss,
                     'goal_distance_loss': goal_distance_loss,
-                    'action_pred': original_action_pred} 
+                    'action_pred': action_pred} 
         else:
             goal_distances, actions = goal_distances.float(), actions.float()
 
@@ -216,6 +216,7 @@ class GNMNumpyWrapper:
             goal_distance_loss = F.mse_loss(distance_pred, goal_distances, reduction="none").mean() 
 
             loss = mse_loss + goal_distance_loss
+            action_pred = self.sample_action(distance_pred, action_pred)
             return {'loss': loss, 'mse_loss': mse_loss, 
                 'l1_loss': l1_loss,
                 'goal_distance_loss': goal_distance_loss,
@@ -223,8 +224,16 @@ class GNMNumpyWrapper:
                 'action_cosine_similarity': similarity_score}
 
     def get_action(self, image, goal_image, task_embedding=None):
-        distance_pred, action_pred_dist = self.forward_np(image, goal_image, task_embedding)
-        return action_pred_dist.detach().cpu().numpy()
+        distance_pred, action_pred = self.forward_np(image, goal_image, task_embedding)
+        return self.sample_action(distance_pred, action_pred)
+
+    def sample_action(self, distance_pred, action_pred):
+        if self.policy.discrete:
+            probs = F.softmax(action_pred, dim=1)
+            probs = torch.permute(probs, (0, 2, 3, 1))
+            return torch.distributions.Categorical(probs).sample()
+        else:
+            return action_pred_dist.detach().cpu().numpy()
 
     def get_distance_pred(self, image, goal_image, task_embedding=None):
         distance_pred, action_pred_dist = self.forward_np(image, goal_image, task_embedding)

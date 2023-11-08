@@ -65,6 +65,7 @@ def discretize_actions(traj, discretize_keys, metadata, eps=1e-9, discretize=Fal
         num_bins = tf.constant(num_bins, dtype=tf.float32)
         def discretize_func(x):
             x = tf.cast(x, dtype=tf.float32)
+            print('min:', metadata[key]["min"])
             action_range = metadata[key]["max"] - metadata[key]["min"] 
             x = tf.clip_by_value((x - metadata[key]["min"]) / (action_range + eps), 0, 1)
             bin_id = (x * (num_bins - 2) + 1) * tf.cast(action_range > 0, dtype=tf.float32)

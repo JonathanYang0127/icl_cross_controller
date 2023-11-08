@@ -1,5 +1,5 @@
 DATASET_SPLITS = {
-    #'gnm_dataset': 500.0,
+    'gnm_dataset': 500.0,
     #'polybot_dataset': 1.0,
     #'bridge_dataset': 4.0,
     #'r2_d2': 4.0,

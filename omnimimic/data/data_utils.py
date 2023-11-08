@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, Sequence, Union
 from functools import partial
 import tensorflow as tf
-
+import numpy as np
 
 def get_goal_idxs(traj_len, min_goal_distance_prop=0.2, max_goal_distance_prop=0.8):
     rand = tf.random.uniform(shape=[traj_len])
@@ -24,8 +24,8 @@ def unnormalize_action(action, metadata, key='action', eps=1e-9, discrete=False,
         action = (action + 1) * action_range + metadata[key]["min"] - eps
     else:
         action_range = (metadata[key]["max"] - metadata[key]["min"])
-        pads = tf.cast(action_range > 0, dtype=tf.float32)
-        action = tf.cast(action, dtype=tf.float32)
+        pads = (action_range > 0).astype(np.float32)
+        action = action.astype(np.float32)
         action = ((action - 1) / (num_bins - 2)) * (action_range + eps) + metadata[key]["min"]
         action = action * pads
     return action   
