@@ -43,7 +43,8 @@ def apply_common_transforms(dataset, config,
     )
 
     #Normalize actions
-    if obs_action_metadata is not None and not config['no_normalization']:
+    if obs_action_metadata is not None and not config['no_normalization'] \
+            and not config['discrete']:
         dataset = dataset.map(
             partial(
                 normalize_obs_and_actions,
@@ -52,7 +53,7 @@ def apply_common_transforms(dataset, config,
             ),
             num_parallel_calls=tf.data.AUTOTUNE
         )
-
+    
     #Get random action sequence
     dataset = dataset.map(
         partial(
@@ -64,12 +65,24 @@ def apply_common_transforms(dataset, config,
         ),
         num_parallel_calls=tf.data.AUTOTUNE
     )
+    #Discretize actions
+    if config['discrete']:
+        dataset = dataset.map(
+            partial(
+                discretize_actions,
+                discretize_keys=['action'],
+                metadata=obs_action_metadata,
+                num_bins=config['num_bins']
+            ),
+            num_parallel_calls=tf.data.AUTOTUNE
+        )
 
     #Process correct keys
     dataset = dataset.map(
         partial(
             process_batch_transform_v2,
-            use_goal_state=config['visualize']
+            use_goal_state=config['visualize'],
+            discrete=config['discrete']
         ),
         num_parallel_calls=tf.data.AUTOTUNE
     )
@@ -89,10 +102,12 @@ def get_obs_action_metadata(
     # check if stats already exist and load, otherwise compute
     all_keys_present = True
     path_exists = tf.io.gfile.exists(path)
+    print(path_exists, load_if_exists)
     if path_exists and load_if_exists:
         print(f"Loading existing statistics for normalization from {path}.")
         with tf.io.gfile.GFile(path, "rb") as f:
             metadata = pickle.load(f)
+        print(metadata.keys())
         for key in keys:
             all_keys_present = (key in metadata.keys()) and all_keys_present
         all_keys_present = 'traj_len' in metadata.keys() and all_keys_present
@@ -158,7 +173,7 @@ def make_dataloader(dataset_name, split, dataloader_config, data_dir=None, valid
         builder,
         dataloader,
         action_keys,
-        load_if_exists=False or validation,
+        load_if_exists=True or validation,
     )
     print(f'{dataset_name}: {metadata}')
     dataloader = apply_common_transforms(dataloader, dataloader_config, 
@@ -166,7 +181,7 @@ def make_dataloader(dataset_name, split, dataloader_config, data_dir=None, valid
     #Ensure observations are not 0
     dataloader = dataloader.filter(lambda e:
         tf.math.reduce_mean(e['observation']['image'][0]) > 0)
-    dataloader = dataloader.flat_map(lambda e: tf.data.Dataset.from_tensor_slices(e))
+    dataloader = dataloader.flatten(num_parallel_calls=8)
     dataloader = dataloader.repeat()
     
     return dataloader, metadata

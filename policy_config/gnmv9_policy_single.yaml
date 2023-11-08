@@ -37,6 +37,8 @@ goal_type: "image"
 mha_num_attention_heads: 4
 mha_num_attention_layers: 4
 mha_ff_dim_factor: 4
+discrete: True
+num_bins: 256
 #image_augmentation: ["random_crop", "color_jitter"]
 
 

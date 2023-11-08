@@ -99,13 +99,25 @@ def main(args):
               'seq_length': policy_config['len_traj_pred'], 
               'visualize': not args['no_visualization'],
               'no_normalization': args['no_normalization'],
-              'image_size': image_size}
+              'image_size': image_size,
+              'discrete': policy_config['discrete'],
+              'num_bins': policy_config['num_bins']}
+    num_interleave=10
     with tf.device('/cpu'):
         for dataset in datasets:
             if dataset in val_datasets:
                 train_split='train'#[:95%]'
             else:
                 train_split = 'train'
+            '''
+            splits = ['train[:20%]', 'train[20%:40%]', 'train[40%:60%]', 'train[60%:80%]', 'train[80%:]']
+            train_dataloader_splits = []
+            for split in splits:
+                train_split, train_meta = make_dataloader(dataset, split, config,
+                    data_dir=TFDS_DATA_DIR)
+                train_dataloader_splits.append(train_split)
+            train_dataloader = tf.data.Dataset.sample_from_datasets(train_dataloader_splits)
+            '''
             train_dataloader, _ = make_dataloader(dataset, train_split, config, 
                 data_dir=TFDS_DATA_DIR)
             train_dataloaders.append(train_dataloader)
@@ -145,6 +157,7 @@ def main(args):
         'num_epochs': num_epochs,
         'sample_weights': DATASET_SPLITS,
         'no_normalization': args['no_normalization'],
+        'dataloader_config': config,
         #'episode_len': episode_len,
         #'state_dim': state_dim,
         'lr': lr,
@@ -222,7 +235,6 @@ def train_bc(train_dataloader, val_dataloaders, val_metadata, train_config, logg
     val_iterators = [d.as_numpy_iterator() for d in val_dataloaders]
 
     for epoch in tqdm(range(num_epochs)):
-        optimizer.zero_grad()
         train_epoch_dicts = []
         lr = optimizer.param_groups[0]["lr"]
         wandb.log({'lr': lr}, step=epoch)
@@ -234,13 +246,14 @@ def train_bc(train_dataloader, val_dataloaders, val_metadata, train_config, logg
             action = batch['action']
             goal_distances = batch['goal_distance_indices'] 
             goal_state = batch.get('goal_state', None)
+            print(batch['dataset_idx'])
 
             loss_dict = policy.compute_loss_np(obs, goal_image, action, goal_distances, task_embedding=None)
             loss = loss_dict['loss']
             if not train_config['test']:
+                optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                optimizer.zero_grad()
 
             loss_dict = detach_dict(loss_dict)
             train_epoch_dicts.append(loss_dict)
@@ -279,7 +292,7 @@ def train_bc(train_dataloader, val_dataloaders, val_metadata, train_config, logg
                                 action[dataloader_idx], visualize_dict, val_key=dataset_name, epoch=epoch)
                             visualize_goal_reaching_plots(obs[dataloader_idx], goal_image[dataloader_idx], goal_state[dataloader_idx], 
                                 action[dataloader_idx], visualize_dict, val_metadata[dataloader_idx], val_key=dataset_name, epoch=epoch,
-                                no_normalization=True)
+                                no_normalization=True, dataloader_config=train_config['dataloader_config'])
 
                             #visualize_action_dist(action[dataloader_idx], visualize_dict, val_key=dataset_name,
                             #        epoch=epoch)

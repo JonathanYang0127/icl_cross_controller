@@ -85,12 +85,15 @@ class GNMPolicy(GNM_V9_SA):
             obs_encoding_size=kwargs['obs_encoding_size'],
             mha_num_attention_heads=kwargs['mha_num_attention_heads'],
             mha_num_attention_layers=kwargs['mha_num_attention_layers'],
-            mha_ff_dim_factor=kwargs['mha_ff_dim_factor']
+            mha_ff_dim_factor=kwargs['mha_ff_dim_factor'],
+            discrete=kwargs['discrete'],
+            num_bins=kwargs['num_bins']
         )
         self.input_width, self.input_height = kwargs['input_width'], kwargs['input_height']
         
         self.lr = kwargs['lr']
         self.model_type = kwargs["model_type"]
+        self.discrete = kwargs['discrete']
         
         self.optimizer_type = kwargs['optimizer']
         if self.optimizer_type == 'sgd':
@@ -99,7 +102,6 @@ class GNMPolicy(GNM_V9_SA):
             self.optimizer = Adam(self.parameters(), lr=float(self.lr))
         elif self.optimizer_type == 'adamw':
             self.optimizer = AdamW(self.parameters(), lr=float(self.lr))
-
 
         self.augmentation_types = kwargs.get('image_augmentation', [])
         self.augmentation_config = dict()
@@ -169,9 +171,12 @@ class GNMNumpyWrapper:
 
     def compute_loss_np(self, image, goal_image, actions, goal_distances, task_embedding=None):
         distance_pred, action_pred = self.forward_np(image, goal_image, task_embedding)
-
+        distance_pred, action_pred = distance_pred.float(), action_pred.float()
+        
         #Use action_pred device for data parallelism
         actions = torch.from_numpy(actions).to(action_pred.device)
+        goal_distances = torch.from_numpy(goal_distances).to(action_pred.device)
+        goal_distances = goal_distances.reshape(-1, 1)
         '''        
         b_size = image.shape[0]
         action_pred = torch.cat((
@@ -183,23 +188,35 @@ class GNMNumpyWrapper:
         actions = actions * 4
         '''
         original_action_pred = action_pred
-        gnm_action_pred = action_pred[:, :, 1:3]
-        gnm_actions = actions[:, :, 1:3]
 
-        #Compute MSE Loss
-        mse_loss = F.mse_loss(action_pred.float(), actions.float(), reduction="none").mean()
+        if self.policy.discrete:   
+            #Compute CE Loss
+            ce_loss = F.cross_entropy(action_pred, actions, reduction='mean')
 
-        similarity = torch.nn.CosineSimilarity(dim=-1, eps=1e-08)
-        similarity_score = similarity(action_pred, actions).mean()
+            #Compute Distance Loss
+            goal_distance_loss = F.mse_loss(distance_pred, goal_distances, reduction="none").mean()
 
-        l1_loss = F.l1_loss(action_pred.float(), actions.float(), reduction="none").mean()
+            loss = ce_loss# + goal_distance_loss
+            return {'loss': loss, 
+                    'ce_loss': ce_loss,
+                    'goal_distance_loss': goal_distance_loss,
+                    'action_pred': original_action_pred} 
+        else:
+            goal_distances, actions = goal_distances.float(), actions.float()
 
-        #Compute Distance Loss
-        goal_distances = torch.from_numpy(goal_distances).to(action_pred.device)
-        goal_distance_loss = F.mse_loss(distance_pred.float(), goal_distances.reshape(-1, 1).float(), reduction="none").mean() 
+            #Compute MSE Loss
+            mse_loss = F.mse_loss(action_pred.float(), actions.float(), reduction="none").mean()
 
-        loss = mse_loss + goal_distance_loss
-        return {'loss': loss, 'mse_loss': mse_loss, 
+            similarity = torch.nn.CosineSimilarity(dim=-1, eps=1e-08)
+            similarity_score = similarity(action_pred, actions).mean()
+
+            l1_loss = F.l1_loss(action_pred, actions, reduction="none").mean()
+
+            #Compute Distance Loss
+            goal_distance_loss = F.mse_loss(distance_pred, goal_distances, reduction="none").mean() 
+
+            loss = mse_loss + goal_distance_loss
+            return {'loss': loss, 'mse_loss': mse_loss, 
                 'l1_loss': l1_loss,
                 'goal_distance_loss': goal_distance_loss,
                 'action_pred': original_action_pred, 

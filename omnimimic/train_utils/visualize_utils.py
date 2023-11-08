@@ -49,8 +49,11 @@ def visualize_action_dist(action, loss_dict, val_key='Train', epoch=0):
 
 
 def visualize_goal_reaching_plots(obs_image, goal_image, goal_state, action, loss_dict, 
-    metadata, num_plots=5, val_key='Train', epoch=0, no_normalization=False):
+    metadata, num_plots=5, val_key='Train', epoch=0, no_normalization=False,
+    dataloader_config=None):
     action_pred_key = [k for k in loss_dict.keys() if 'action_pred' in k][0]
+    discrete = dataloader_config['discrete']
+    num_bins = dataloader_config['num_bins']
 
     for i in range(num_plots):
         obs_img = obs_image[i]
@@ -59,8 +62,10 @@ def visualize_goal_reaching_plots(obs_image, goal_image, goal_state, action, los
         pred_waypoints = loss_dict[action_pred_key][i]
         gt_waypoints = action[i]
         if not no_normalization:
-            pred_waypoints = unnormalize_action(pred_waypoints)
-            gt_waypoints = unnormalize_action(gt_waypoints)
+            pred_waypoints = unnormalize_action(pred_waypoints, 
+                    discrete=discrete, num_bins=num_bins)
+            gt_waypoints = unnormalize_action(gt_waypoints, 
+                    discrete=discrete, num_bins=num_bins)
         pred_waypoints = pred_waypoints[:, 2:0:-1]
         gt_waypoints = gt_waypoints[:, 2:0:-1]
         pred_waypoints[:, 0] *= -1

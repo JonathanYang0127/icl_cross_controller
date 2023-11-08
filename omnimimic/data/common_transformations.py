@@ -30,8 +30,8 @@ def relabel_goal_image(traj, metadata):
         lambda x: tf.gather(x, goal_idxs),
         traj["observation"]["image"]
     )
-    if metadata is not None:
-        traj["goal_distance_indices"] /= tf.cast(metadata['traj_len'], tf.float32)
+
+    traj["goal_distance_indices"] /= tf.cast(metadata['traj_len'], tf.float32)
 
     return traj
 
@@ -42,7 +42,7 @@ def normalize_obs_and_actions(traj, action_keys, metadata, eps=1e-9):
     '''
     normal_keys = []
     min_max_keys = action_keys
-    
+
     for key in normal_keys:
         map_nested_dict_index(
             traj,
@@ -58,6 +58,22 @@ def normalize_obs_and_actions(traj, action_keys, metadata, eps=1e-9):
                 / (metadata[key]["max"] - metadata[key]["min"] + eps) - 1,
                 -1,
                 1)
+        )
+
+def discretize_actions(traj, discretize_keys, metadata, eps=1e-9, discretize=False, num_bins=256):
+    for key in discretize_keys:
+        num_bins = tf.constant(num_bins, dtype=tf.float32)
+        def discretize_func(x):
+            x = tf.cast(x, dtype=tf.float32)
+            action_range = metadata[key]["max"] - metadata[key]["min"] 
+            x = tf.clip_by_value((x - metadata[key]["min"]) / (action_range + eps), 0, 1)
+            bin_id = (x * (num_bins - 2) + 1) * tf.cast(action_range > 0, dtype=tf.float32)
+            return tf.cast(bin_id, dtype=tf.int64)
+
+        map_nested_dict_index(
+            traj,
+            key,
+            discretize_func  
         )
 
     return traj
@@ -87,7 +103,6 @@ def random_dataset_sequence_transform_v2(traj, frame_stack, seq_length,
     indices = tf.reshape(tf.range(traj_len), [-1, 1])  \
         + tf.range(0, seq_length)
     traj['action'] = tf.gather(traj['action'], indices)
-
     return traj
 
 
@@ -134,7 +149,7 @@ def random_dataset_sequence_transform(traj, frame_stack, seq_length,
     return traj
 
 
-def process_batch_transform_v2(traj, use_goal_state):
+def process_batch_transform_v2(traj, use_goal_state, discrete):
     new_traj = dict()
     new_traj['observation'] = dict()
     new_traj['observation']['image'] = traj['observation']['image']
@@ -143,7 +158,10 @@ def process_batch_transform_v2(traj, use_goal_state):
         new_traj['goal_state'] = traj['goal_state']
     new_traj['goal_distance_indices'] = traj['goal_distance_indices']
     new_traj['goal_idxs'] = traj['goal_idxs']
-    new_traj['action'] = tf.cast(traj['action'], dtype=tf.float32)
+    new_traj['action'] = traj['action']
+    if not discrete:
+        new_traj['action'] = tf.cast(traj['action'], dtype=tf.float32)
+    new_traj['dataset_idx'] = traj['dataset_idx']
     return new_traj
 
 def process_batch_transform(traj):

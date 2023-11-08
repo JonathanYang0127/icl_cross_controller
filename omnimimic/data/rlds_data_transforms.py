@@ -84,7 +84,9 @@ def gnm_dataset_transform(
         trajectory['observation']['yaw_rotmat'][:, :2, :2]), 1)
     trajectory["goal_state"] /= normalization_factor
     trajectory["goal_distance_indices"] = tf.cast(goal_idxs, tf.float32) - tf.cast(tf.range(traj_len), tf.float32) 
-    
+   
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 0
     return trajectory
 
 
@@ -119,6 +121,8 @@ def polybot_dataset_transform(
     #    dim=-1
     #)
     trajectory["goal_distance_indices"] = tf.cast(goal_idxs - low, tf.float32) 
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 1
     return trajectory
 
 
@@ -151,7 +155,8 @@ def bridge_dataset_transform(
 
     #Reverse Action Dim 1 
     trajectory["action"] *= [1, -1, 1, 1, 1, 1, 1]
-
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 2
     return trajectory
 
 
@@ -180,7 +185,8 @@ def r2d2_dataset_transform(
 
     #Reverse Action Dim 1 
     trajectory["action"] *= [1, -1, 1, 1, 1, 1, 1]
-
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 3
     return trajectory
 
 
@@ -210,7 +216,8 @@ def jaco_play_dataset_transform(trajectory, config) -> Dict[str, Any]:
         ),
         axis=-1,
     )
-
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 4
     return trajectory
 
 
@@ -227,7 +234,8 @@ def kuka_dataset_transform(trajectory, config) -> Dict[str, Any]:
         ),
         axis=-1,
     )
-
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 5
     return trajectory
 
 
@@ -244,6 +252,8 @@ def taco_play_dataset_transform(trajectory, config):
     #Set action
     trajectory["action"] = trajectory["action"]["rel_actions_world"]
 
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 6
     return trajectory
 
 
@@ -269,6 +279,8 @@ def berkeley_cable_routing_dataset_transform(
         ),
         axis=-1,
     )
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 7
     return trajectory
 
 
@@ -285,6 +297,8 @@ def roboturk_dataset_transform(trajectory, config):
         ),
         axis=-1,
     )
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 8
     return trajectory
 
 
@@ -301,6 +315,8 @@ def nyu_door_opening_dataset_transform(trajectory, config):
         ),
         axis=-1,
     ) 
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 9
     return trajectory
 
 
@@ -323,6 +339,8 @@ def viola_dataset_transform(trajectory, config):
         ),
         axis=-1,
     )
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 10
     return trajectory
 
 
@@ -345,6 +363,8 @@ def berkeley_autolab_ur5_dataset_transform(trajectory, config):
         ),
         axis=-1,
     )
+    traj_len = tf.shape(trajectory['action'])[0]    
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 11
     return trajectory
 
 def toto_dataset_transform(trajectory, config):
@@ -360,6 +380,8 @@ def toto_dataset_transform(trajectory, config):
         ),
         axis=-1,
     )
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 12
     return trajectory
 
 
@@ -376,6 +398,8 @@ def rt1_dataset_transform(trajectory, config):
         ),
         axis=-1,
     )
+    traj_len = tf.shape(trajectory['action'])[0]
+    trajectory['dataset_idx'] = tf.ones([traj_len]) * 13
     return trajectory
 
 

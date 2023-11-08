@@ -2,7 +2,7 @@
 #SBATCH --partition=iris-hi
 #SBATCH --time=5-00:00:00
 #SBATCH --nodes=1
-#SBATCH --mem=150G
+#SBATCH --mem=200G
 
 # only use the following on partition with GPUs
 #SBATCH --gres=gpu:1

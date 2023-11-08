@@ -18,10 +18,16 @@ def get_goal_idxs(traj_len, min_goal_distance_prop=0.2, max_goal_distance_prop=0
     return high, low, goal_idxs
 
 
-def unnormalize_action(action, metadata, key='action', eps=1e-9):
-    action_range = (metadata[key]["max"] - metadata[key]["min"] + eps) / 2
-    action = (action + 1) * action_range + metadata[key]["min"] - eps
-
+def unnormalize_action(action, metadata, key='action', eps=1e-9, discrete=False, num_bins=256):
+    if not discrete:
+        action_range = (metadata[key]["max"] - metadata[key]["min"] + eps) / 2
+        action = (action + 1) * action_range + metadata[key]["min"] - eps
+    else:
+        action_range = (metadata[key]["max"] - metadata[key]["min"])
+        pads = tf.cast(action_range > 0, dtype=tf.float32)
+        action = tf.cast(action, dtype=tf.float32)
+        action = ((action - 1) / (num_bins - 2)) * (action_range + eps) + metadata[key]["min"]
+        action = action * pads
     return action   
 
 

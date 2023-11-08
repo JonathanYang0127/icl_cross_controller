@@ -15,7 +15,7 @@ conda deactivate
 conda activate navigation_env
 
 cd /iris/u/jyang27/dev/omnimimic/scripts
-python analyze_model.py
+python analyze_model_v2.py
 
 #done
 

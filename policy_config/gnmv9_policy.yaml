@@ -37,6 +37,8 @@ goal_type: "image"
 mha_num_attention_heads: 4
 mha_num_attention_layers: 4
 mha_ff_dim_factor: 4
+discrete: True
+num_bins: 256
 #image_augmentation: ["random_crop", "color_jitter"]
 
 
@@ -60,7 +62,7 @@ action:
 close_far_threshold: 10 # distance threshold used to seperate the close and the far  subgoals that are sampled per datapoint
 
 # action output params
-len_traj_pred: 5
+len_traj_pred: 1
 learn_angle: True
 
 # dataset specific parameters

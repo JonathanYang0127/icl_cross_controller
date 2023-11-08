@@ -24,6 +24,8 @@ class GNM_V9_SA(BaseModel):
         mha_num_attention_heads: Optional[int] = 2,
         mha_num_attention_layers: Optional[int] = 2,
         mha_ff_dim_factor: Optional[int] = 4,
+        discrete=False,
+        num_bins=256
     ) -> None:
         """
         GNMv9 class: Uses the architecture from v4, but uses a multi-headed self-attention block for the context.
@@ -32,7 +34,12 @@ class GNM_V9_SA(BaseModel):
         super(GNM_V9_SA, self).__init__(context_size, len_traj_pred, learn_angle)
         self.obs_encoding_size = obs_encoding_size
         self.goal_encoding_size = obs_encoding_size
-        # self.goal_encoder = goal_encoder
+        # self.goal_encoder = goal_encode
+
+        if discrete:
+            self.num_bins = num_bins
+        else:
+            self.num_bins = 1
 
         if obs_encoder.split("-")[0] == "efficientnet":
             self.obs_encoder = EfficientNet.from_name(obs_encoder, in_channels=3) # context
@@ -66,10 +73,10 @@ class GNM_V9_SA(BaseModel):
             ff_dim_factor=mha_ff_dim_factor,
         )
         self.dist_predictor = nn.Sequential(
-            nn.Linear(32, 1),
+                nn.Linear(32, 1),
         )
         self.action_predictor = nn.Sequential(
-            nn.Linear(32, self.len_trajectory_pred * self.num_action_params),
+            nn.Linear(32, self.len_trajectory_pred * self.num_action_params * self.num_bins),
         )
         self.test_predictor = nn.Linear(512, 32)
 
@@ -129,7 +136,7 @@ class GNM_V9_SA(BaseModel):
 
         # augment outputs to match labels size-wise
         action_pred = action_pred.reshape(
-            (action_pred.shape[0], self.len_trajectory_pred, self.num_action_params)
+            (action_pred.shape[0], self.num_bins, self.len_trajectory_pred, self.num_action_params)
         )
         '''
         action_pred[:, :, :2] = torch.cumsum(

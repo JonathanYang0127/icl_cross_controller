@@ -14,7 +14,7 @@ conda deactivate
 conda activate navigation_env
 
 cd /iris/u/jyang27/dev/omnimimic/scripts
-python imitate_episodes.py --policy-class GNM --policy-config ../policy_config/gnmv9_policy.yaml --datasets all --val-datasets all --seed 70 --no-visualization --checkpoint /iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-10-30-GNM-omnimimic-seed-70_45-1-20/policy_epoch_70_seed_70.ckpt --gpu-ids 0 1
+python imitate_episodes.py --policy-class GNM --policy-config ../policy_config/gnmv9_policy.yaml --datasets all --val-datasets all --seed 70 --no-visualization --checkpoint /iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-03-GNM-omnimimic-seed-70_53-23-29/policy_epoch_40_seed_70.ckpt  --gpu-ids 0 1
 
 #done
 
