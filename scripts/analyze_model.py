@@ -5,22 +5,14 @@ from functools import partial
 from omnimimic.data.rlds_data_transforms import RLDS_TRANSFORM_DICT
 from omnimimic.data.dataset import *
 from omnimimic.data.data_splits import DATASET_SPLITS
-from omnimimic.policies import GCConvPolicy, ACTPolicy, GNMPolicy
+from omnimimic.policies import *
 import omnimimic.torch.pytorch_util as ptu
 import yaml
 import matplotlib.pyplot as plt
 
-POLICY_CONFIG_PATH = '/iris/u/jyang27/dev/omnimimic/policy_config/gnmv9_policy.yaml'
-POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-10-30-GNM-omnimimic-seed-70_45-1-20/policy_epoch_120_seed_70.ckpt' 
-
-def make_policy(policy_class, policy_config):
-    if policy_class == 'ACT':
-        policy = ACTPolicy(**policy_config)
-    elif policy_class == 'ConvNet':
-        policy = GCConvPolicy(**policy_config)
-    elif policy_class == 'GNM':
-        policy = GNMPolicy(**policy_config)
-    return policy
+POLICY_CONFIG_PATH = '/iris/u/jyang27/dev/omnimimic/policy_config/gnmv9_policy_single.yaml'
+POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-03-GNM-omnimimic-seed-70_53-23-29/policy_epoch_30_seed_70.ckpt' 
+POLICY_CHECKPOINT = "/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_48-6-20/policy_epoch_5_seed_70.ckpt" 
 
 def detach_dict(d):
     new_d = dict()
@@ -50,7 +42,8 @@ def analyze_policy(dataset_name, policy):
     config = {'wrist_image_only': True,
               'seq_length': 5,
               'visualize': False,
-              'no_normalization': False}
+              'no_normalization': False,
+              'image_size': (64, 64)}
     print(datasets)
     batch_size_train = 20
     with tf.device('/cpu'):
@@ -108,6 +101,8 @@ if __name__ == '__main__':
             state_dict = torch.load(f)
             policy.load_state_dict(state_dict)
     policy.to(ptu.device)
+    wrapper = get_numpy_wrapper('GNM')
+    policy = wrapper(policy)
     print("Done loading policy!")
 
     for name in DATASET_SPLITS.keys():

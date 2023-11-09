@@ -9,10 +9,11 @@ from omnimimic.policies import *
 import omnimimic.torch.pytorch_util as ptu
 import yaml
 import matplotlib.pyplot as plt
+import glob 
 
 POLICY_CONFIG_PATH = '/iris/u/jyang27/dev/omnimimic/policy_config/gnmv9_policy.yaml'
-POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-03-GNM-omnimimic-seed-70_53-23-29/policy_epoch_40_seed_70.ckpt' 
-
+POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_48-6-20/*'
+POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_3-12-/*'
 
 def detach_dict(d):
     new_d = dict()
@@ -20,27 +21,35 @@ def detach_dict(d):
         new_d[k] = v.detach().cpu()
     return new_d
 
-
-def compute_dict_mean(epoch_dicts):
+def compute_dict_mean(epoch_dicts, ignore=['action_pred']):
     result = {k: None for k in epoch_dicts[0]}
     num_items = len(epoch_dicts)
     for k in result:
+        skip = False
+        for i_key in ignore:
+            if i_key in k:
+                skip = True
+                break
+        if skip:
+            continue
         value_sum = 0
         for epoch_dict in epoch_dicts:
             value_sum += epoch_dict[k].mean(dim=0)
         result[k] = value_sum / num_items
     return result
-   
-def analyze_policy():
+
+def load_data():
     TFDS_DATA_DIR = '/iris/u/jyang27/rlds_data'
     datasets = list(DATASET_SPLITS.keys())
     #n_datasets = len(datasets)
     train_dataloaders, val_dataloaders, val_metadata = [], [], []
     config = {'wrist_image_only': True,
-              'seq_length': 5,
+              'seq_length': 1,
               'visualize': False,
               'no_normalization': False,
-               'image_size': (64, 64)}
+               'image_size': (64, 64),
+               'discrete': True,
+               'num_bins': 256}
     print(datasets)
     batch_size_train = 50
     with tf.device('/cpu'):
@@ -63,7 +72,9 @@ def analyze_policy():
              batch_size_train, shuffle_size=None)
 
     train_iterator = train_dataloader.as_numpy_iterator()
+    return train_iterator
 
+def analyze_policy(train_iterator, policy):
     train_epoch_dicts = []
     for batch_idx in tqdm(range(1000)):
         batch = next(train_iterator)
@@ -91,14 +102,18 @@ if __name__ == '__main__':
         policy_config = yaml.safe_load(f)
 
     print("Loading Policy")
-    policy = make_policy('GNM', policy_config)
-    print("Loading Checkpoint")
-    if POLICY_CHECKPOINT is not None:
-        with open(POLICY_CHECKPOINT, 'rb') as f:
-            state_dict = torch.load(f)
-            policy.load_state_dict(state_dict)
-    policy.to(ptu.device)
-    wrapper = get_numpy_wrapper('GNM')
-    policy = wrapper(policy)
-    print("Done loading policy!")
-    analyze_policy()
+    base_policy = make_policy('GNM', policy_config)
+
+    train_iterator = load_data()
+    paths = glob.glob(POLICY_CHECKPOINT)
+    for path in paths:
+        print(f"Loading Checkpoint {path}")
+        if path is not None:
+            with open(path, 'rb') as f:
+                state_dict = torch.load(f)
+                base_policy.load_state_dict(state_dict)
+        base_policy.to(ptu.device)
+        wrapper = get_numpy_wrapper('GNM')
+        policy = wrapper(base_policy)
+        analyze_policy(train_iterator, policy)
+

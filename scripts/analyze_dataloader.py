@@ -10,16 +10,16 @@ import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
     TFDS_DATA_DIR = '/iris/u/jyang27/rlds_data'
-    datasets = list(DATASET_SPLITS.keys())[:3]
+    datasets = list(DATASET_SPLITS.keys())
     #n_datasets = len(datasets)
-    #datasets = ['taco_play']
     train_dataloaders, val_dataloaders, val_metadata = [], [], []
     config = {'wrist_image_only': True,
               'seq_length': 5,
               'visualize': False,
-              'no_normalization': False}
+              'no_normalization': False,
+               'image_size': (64, 64)}
     print(datasets)
-    batch_size_train = 20
+    batch_size_train = 50
     with tf.device('/cpu'):
         for dataset in datasets:
             #if dataset in val_datasets:
@@ -37,11 +37,15 @@ if __name__ == '__main__':
         train_dataloader = tf.data.Dataset.sample_from_datasets(
             train_dataloaders, sample_weights)
         train_dataloader = shuffle_batch_and_prefetch_dataloader(train_dataloader,
-             batch_size_train, shuffle_size=10000)
+             batch_size_train, shuffle_size=None)
 
     train_dataloader = train_dataloader.as_numpy_iterator()
-    traj = next(train_dataloader)
+    for i in range(10):
+        traj = next(train_dataloader)
+        print(traj['dataset_idx'])
 
     for i in range(batch_size_train):
         plt.imsave(f'analyze_images/analyze_{i}.png', traj['observation']['image'][i])
-        print(traj['action'][i])
+        plt.imsave(f'analyze_images/analyze_goal_{i}.png', traj['goal_image'][i])
+        print(traj['goal_idxs'])
+        print(traj['goal_distance_indices'])
