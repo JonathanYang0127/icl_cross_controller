@@ -203,7 +203,7 @@ def compute_dict_mean(epoch_dicts, ignore=['action_pred']):
         for epoch_dict in epoch_dicts:
             value_sum += epoch_dict[k].mean(dim=0)
         result[k] = value_sum / num_items
-    return result
+    return {k: v for k, v in result.items() if v is not None}
 
 def detach_dict(d):
     new_d = dict()

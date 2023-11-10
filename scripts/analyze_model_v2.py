@@ -19,6 +19,7 @@ import wandb
 POLICY_CONFIG_PATH = '/iris/u/jyang27/dev/omnimimic/policy_config/gnmv9_policy.yaml'
 POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_48-6-20/*'
 POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_3-12-4/*'
+POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_26-12-39/*'
 
 def detach_dict(d):
     new_d = dict()
@@ -27,7 +28,7 @@ def detach_dict(d):
     return new_d
 
 def compute_dict_mean(epoch_dicts, ignore=['action_pred']):
-    result = {}
+    result = {k: None for k in epoch_dicts[0]}
     num_items = len(epoch_dicts)
     for k in result:
         skip = False
@@ -41,7 +42,7 @@ def compute_dict_mean(epoch_dicts, ignore=['action_pred']):
         for epoch_dict in epoch_dicts:
             value_sum += epoch_dict[k].mean(dim=0)
         result[k] = value_sum / num_items
-    return result
+    return {k: v for k, v in result.items() if v is not None}
 
 def analyze_policy(train_iterator, policy):
     train_epoch_dicts = []

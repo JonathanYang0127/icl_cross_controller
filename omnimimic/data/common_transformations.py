@@ -59,6 +59,8 @@ def normalize_obs_and_actions(traj, action_keys, metadata, eps=1e-9):
                 -1,
                 1)
         )
+    
+    return traj
 
 def discretize_actions(traj, discretize_keys, metadata, eps=1e-9, discretize=False, num_bins=256):
     for key in discretize_keys:

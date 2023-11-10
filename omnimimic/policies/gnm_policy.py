@@ -195,7 +195,7 @@ class GNMNumpyWrapper:
             #Compute Distance Loss
             goal_distance_loss = F.mse_loss(distance_pred, goal_distances, reduction="none").mean()
 
-            loss = ce_loss# + goal_distance_loss
+            loss = ce_loss + goal_distance_loss
             action_pred = self.sample_action(distance_pred, action_pred)
             return {'loss': loss, 
                     'ce_loss': ce_loss,
