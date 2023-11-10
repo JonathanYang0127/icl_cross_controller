@@ -27,7 +27,7 @@ def detach_dict(d):
     return new_d
 
 def compute_dict_mean(epoch_dicts, ignore=['action_pred']):
-    result = {k: None for k in epoch_dicts[0]}
+    result = {}
     num_items = len(epoch_dicts)
     for k in result:
         skip = False
@@ -92,7 +92,7 @@ if __name__ == '__main__':
                'image_size': (64, 64),
                'discrete': True,
                'num_bins': 256}
-    batch_size_train = 400
+    batch_size_train = 20
     with tf.device('/cpu'):
         for dataset in datasets:
             train_split = 'train'
@@ -151,6 +151,6 @@ if __name__ == '__main__':
         train_epoch_summary = {"train/"+key: value for key, value in train_epoch_summary.items()}
         print("Train Epoch Summary", train_epoch_summary)
         checkpoint_name = os.path.basename(path)
-        epoch = int(path.split('_')[2])
-        logger.log(data=val_epoch_summary, step=epoch)
+        epoch = int(checkpoint_name.split('_')[2])
+        logger.log(data=train_epoch_summary, step=epoch)
 
