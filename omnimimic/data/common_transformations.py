@@ -112,7 +112,7 @@ def random_dataset_sequence_transform_v2(traj, frame_stack, seq_length,
         axis=0)
 
     #Get sequence length images
-    if frame_stack != [0]:
+    if frame_stack != 0:
         indices = tf.reshape(tf.range(traj_len), [-1, 1])  \
             + tf.range(0, frame_stack + 1)
         obs = tf.gather(traj['observation']['image'], indices)
