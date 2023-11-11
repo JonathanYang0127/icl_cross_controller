@@ -145,7 +145,7 @@ def main(args):
         train_dataloader = tf.data.Dataset.sample_from_datasets(
             train_dataloaders, sample_weights)
         train_dataloader = shuffle_batch_and_prefetch_dataloader(train_dataloader, 
-             batch_size_train, shuffle_size=None)
+             batch_size_train, shuffle_size=10000)
 
     current_time = datetime.now()
     checkpoint_dir = f'{exp_name}_{current_time.minute}-{current_time.hour}-{current_time.second}' 
