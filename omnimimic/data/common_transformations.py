@@ -87,25 +87,39 @@ def random_dataset_sequence_transform_v2(traj, frame_stack, seq_length,
     '''
     Extract a random subsequence of the data given sequence_length given keys
     '''
+    traj_len = tf.shape(traj["action"])[0]
 
     if 'action_sequence' in traj.keys():
         traj_len = tf.shape(traj["action"])[0]
         traj['action'] = traj['action_sequence']
-        return traj
-
-    traj_len = tf.shape(traj["action"])[0]
-
-    #Pad actions
-    padding = tf.tile(tf.zeros_like(traj['action'][-1:, :]),
+    else:
+        #Pad actions
+        padding = tf.tile(tf.zeros_like(traj['action'][-1:, :]),
             [seq_length - 1, 1])
-    traj['action'] = tf.concat(
-        (traj['action'], padding),
+        traj['action'] = tf.concat(
+            (traj['action'], padding),
+            axis=0)
+
+        #Get sequence length actions
+        indices = tf.reshape(tf.range(traj_len), [-1, 1])  \
+            + tf.range(0, seq_length)
+        traj['action'] = tf.gather(traj['action'], indices)
+
+    #Pad frames
+    padding = tf.repeat([traj['observation']['image'][0]], repeats=[frame_stack], axis=0)
+    traj['observation']['image'] = tf.concat(
+        (padding, traj['observation']['image']),
         axis=0)
 
-    #Get sequence length actions
-    indices = tf.reshape(tf.range(traj_len), [-1, 1])  \
-        + tf.range(0, seq_length)
-    traj['action'] = tf.gather(traj['action'], indices)
+    #Get sequence length images
+    if frame_stack != [0]:
+        indices = tf.reshape(tf.range(traj_len), [-1, 1])  \
+            + tf.range(0, frame_stack + 1)
+        obs = tf.gather(traj['observation']['image'], indices)
+        obs = tf.transpose(obs, perm=[0, 2, 3, 1, 4])
+        os = tf.shape(obs)
+        traj['observation']['image'] = tf.reshape(obs, (os[0], os[1], os[2], 
+            os[3] * os[4]))
     return traj
 
 

@@ -20,6 +20,7 @@ POLICY_CONFIG_PATH = '/iris/u/jyang27/dev/omnimimic/policy_config/gnmv9_policy.y
 POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_48-6-20/*'
 POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_3-12-4/*'
 POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_26-12-39/*'
+POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_46-22-1/*'
 
 def detach_dict(d):
     new_d = dict()

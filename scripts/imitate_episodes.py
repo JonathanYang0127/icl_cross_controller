@@ -20,7 +20,7 @@ from functools import partial
 
 from omnimimic.policies import *
 from omnimimic.data.dataset import *
-from omnimimic.data.data_splits import DATASET_SPLITS
+from omnimimic.data.data_splits import DATASET_SPLITS, VERSION_DICT
 from omnimimic.train_utils.visualize_utils import (visualize_obs_action,
     visualize_action_dist, visualize_goal_reaching_plots)
 import omnimimic.torch.pytorch_util as ptu
@@ -92,11 +92,12 @@ def main(args):
         datasets = list(DATASET_SPLITS.keys())
     if 'all' in val_datasets:
         val_datasets = list(DATASET_SPLITS.keys())
-    n_datasets = len(datasets)
     image_size=(policy_config['input_height'], policy_config['input_width'])
     train_dataloaders, val_dataloaders, val_metadata = [], [], []
+    train_dataloader_names = []
     config = {'wrist_image_only': args['wrist_only'], 
-              'seq_length': policy_config['len_traj_pred'], 
+              'seq_length': policy_config['len_traj_pred'],
+              'context_size': policy_config['context_size'], 
               'visualize': not args['no_visualization'],
               'no_normalization': args['no_normalization'],
               'image_size': image_size,
@@ -118,9 +119,11 @@ def main(args):
                 train_dataloader_splits.append(train_split)
             train_dataloader = tf.data.Dataset.sample_from_datasets(train_dataloader_splits)
             '''
-            train_dataloader, _ = make_dataloader(dataset, train_split, config, 
-                data_dir=TFDS_DATA_DIR)
-            train_dataloaders.append(train_dataloader)
+            for version in VERSION_DICT.get(dataset, [None]):
+                train_dataloader, _ = make_dataloader(dataset, train_split, config, 
+                    data_dir=TFDS_DATA_DIR, version=version)
+                train_dataloaders.append(train_dataloader)
+                train_dataloader_names.append(dataset)
 
             if dataset in val_datasets:
                 splits = ['train[:1%]', 'train[20%:21%]', 'train[40%:41%]', 'train[60%:61%]', 'train[80%:81%]']
@@ -136,7 +139,7 @@ def main(args):
                 val_metadata.append(val_meta)
 
         #Interleave train dataloaders
-        sample_weights = [DATASET_SPLITS[d] for d in datasets]
+        sample_weights = [DATASET_SPLITS[d] for d in train_dataloader_names]
         print(sample_weights)
         sample_weights /= tf.reduce_sum(sample_weights)
         train_dataloader = tf.data.Dataset.sample_from_datasets(

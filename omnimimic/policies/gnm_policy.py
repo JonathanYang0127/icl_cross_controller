@@ -174,8 +174,8 @@ class GNMNumpyWrapper:
         distance_pred, action_pred = distance_pred.float(), action_pred.float()
         
         #Use action_pred device for data parallelism
-        actions = torch.from_numpy(actions).to(action_pred.device)
-        goal_distances = torch.from_numpy(goal_distances).to(action_pred.device)
+        actions = torch.from_numpy(np.array(actions)).to(action_pred.device)
+        goal_distances = torch.from_numpy(np.array(goal_distances)).to(action_pred.device)
         goal_distances = goal_distances.reshape(-1, 1)
         '''        
         b_size = image.shape[0]

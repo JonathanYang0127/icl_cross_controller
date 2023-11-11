@@ -58,7 +58,7 @@ def apply_common_transforms(dataset, config,
     dataset = dataset.map(
         partial(
             random_dataset_sequence_transform_v2,
-            frame_stack=1,
+            frame_stack=config['context_size'],
             seq_length=config['seq_length'],
             pad_frame_stack=True,
             pad_seq_length=True
@@ -145,11 +145,10 @@ def get_obs_action_metadata(
     return metadata
 
 
-def make_dataloader(dataset_name, split, dataloader_config, data_dir=None, validation=False):
+def make_dataloader(dataset_name, split, dataloader_config, data_dir=None, validation=False, version=None):
     dataset_name_and_version = dataset_name
-    if dataset_name in VERSION_DICT.keys():
-        dataset_name_and_version = dataset_name + ':' + VERSION_DICT[dataset_name]
-    print(dataset_name_and_version)
+    if version is not None:
+        dataset_name_and_version = dataset_name + ':' + version
     builder = tfds.builder(dataset_name_and_version, data_dir=data_dir)
     '''
     dataset = builder.as_dataset(
