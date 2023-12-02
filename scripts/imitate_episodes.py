@@ -1,8 +1,8 @@
 import torch
 import numpy as np
 import os
-os.environ['WANDB_API_KEY'] = '6bc5ed6cff29e874c30c04f4a29faae7ae603964' 
-os.environ['WANDB_ENTITY'] = 'jyang27'
+os.environ['WANDB_API_KEY'] = 'a83d04a0c8fd23b049d3beae48c339102b1caf6e' 
+os.environ['WANDB_ENTITY'] = 'catglossop'
 os.environ["WANDB__SERVICE_WAIT"] = "300"
 import pickle
 import argparse
@@ -87,7 +87,7 @@ def main(args):
     lr = policy_config['lr']
 
     #Define Dataloaders
-    TFDS_DATA_DIR = '/iris/u/jyang27/rlds_data'
+    TFDS_DATA_DIR = '/global/scratch/users/catherineglossop/data'
     if 'all' in datasets:
         datasets = list(DATASET_SPLITS.keys())
     if 'all' in val_datasets:
