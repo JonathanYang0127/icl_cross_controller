@@ -18,6 +18,6 @@ conda activate /global/scratch/users/catherineglossop/miniconda3/omni
 module load cuda/12.2
 export LD_PRELOAD=/global/software/sl-7.x86_64/modules/cuda/11.4/cudnn/8.7.0/lib64/libcudnn.so
 export NCCL_P2P_DISABLE=1
-torchrun --standalone --nproc_per_node=2 imitate_episodes.py --policy-class GNM --policy-config ../policy_config/gnmv9_policy.yaml --datasets all --val-datasets all --seed 70 --no-visualization --gpu-ids 0 1
+python imitate_episodes.py --policy-class GNM --policy-config ../policy_config/gnmv9_policy.yaml --datasets all --val-datasets all --seed 70 --no-visualization --gpu-ids 0 1
 
 #done
