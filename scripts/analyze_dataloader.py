@@ -1,9 +1,9 @@
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from functools import partial
-from icl_controller_transfer.data.rlds_data_transforms import RLDS_TRANSFORM_DICT
-from icl_controller_transfer.data.dataset import *
-from icl_controller_transfer.data.data_splits import DATASET_SPLITS
+from controller_transfer.data.rlds_data_transforms import RLDS_TRANSFORM_DICT
+from controller_transfer.data.dataset import *
+from controller_transfer.data.data_splits import DATASET_SPLITS
 
 import matplotlib.pyplot as plt
 

@@ -1,13 +1,13 @@
-from icl_controller_transfer.policies.gnm_train.models.gnm_v9 import GNM_V9_SA
-from icl_controller_transfer.policies.gnm_train.models.vint import ViNT
-from icl_controller_transfer.policies.utils import get_augmentation_transforms
+from controller_transfer.policies.gnm_train.models.gnm_v9 import GNM_V9_SA
+from controller_transfer.policies.gnm_train.models.vint import ViNT
+from controller_transfer.policies.utils import get_augmentation_transforms
 
 import numpy as np
 import torch.nn.functional as F
 from torch.optim import AdamW, Adam, SGD
 from torch.distributions import constraints, Distribution, Independent, Normal
 import torch
-import icl_controller_transfer.torch.pytorch_util as ptu
+import controller_transfer.torch.pytorch_util as ptu
 from warmup_scheduler import GradualWarmupScheduler
 
 class GaussianGNMPolicy(GNM_V9_SA):

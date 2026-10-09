@@ -2,7 +2,7 @@ import numpy as np
 import wandb
 import matplotlib.pyplot as plt
 from typing import Dict, Optional
-from icl_controller_transfer.data.data_utils import unnormalize_action
+from controller_transfer.data.data_utils import unnormalize_action
 
 #Define colors for convenience
 RED = np.array([1, 0, 0])

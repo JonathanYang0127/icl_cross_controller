@@ -13,7 +13,7 @@ source ~/.bashrc
 conda deactivate 
 conda activate navigation_env
 
-cd /iris/u/jyang27/dev/icl_controller_transfer/scripts
+cd /iris/u/jyang27/dev/controller_transfer/scripts
 python imitate_episodes.py --policy-class GNM --policy-config ../policy_config/gnmv9_policy.yaml --datasets polybot_dataset gnm_dataset --val-datasets polybot_dataset gnm_dataset --seed 20  --no-visualization
 
 

@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from functools import partial
-from icl_controller_transfer.data.rlds_data_transforms import RLDS_TRANSFORM_DICT
+from controller_transfer.data.rlds_data_transforms import RLDS_TRANSFORM_DICT
 
 import matplotlib.pyplot as plt
 

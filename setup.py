@@ -2,7 +2,7 @@ from distutils.core import setup
 from setuptools import find_packages
 
 setup(
-    name='icl-controller-transfer',
+    name='controller_transfer',
     version='0.2',
     packages=find_packages(),
     license='MIT License',

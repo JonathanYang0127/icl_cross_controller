@@ -13,7 +13,7 @@ source ~/.bashrc
 conda deactivate 
 conda activate iris_env
 
-cd /iris/u/jyang27/dev/icl_controller_transfer/scripts
+cd /iris/u/jyang27/dev/controller_transfer/scripts
 python imitate_episodes.py --policy-class GNM --policy-config ../policy_config/gnmv9_policy_small.yaml --dataset fractal20220817_data --val-dataset fractal20220817_data --seed 10 --no-visualization
 
 #done

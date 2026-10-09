@@ -14,7 +14,7 @@ conda deactivate
 #conda activate iris_env
 conda activate navigation_env
 
-cd /iris/u/jyang27/dev/icl_controller_transfer/scripts
+cd /iris/u/jyang27/dev/controller_transfer/scripts
 python analyze_model_v2.py
 
 #done

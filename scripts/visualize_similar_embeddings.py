@@ -14,8 +14,8 @@ import rlds
 import time
 from typing import Any, Dict
 from functools import partial
-from icl_controller_transfer.policies import GCConvPolicy, ACTPolicy, GNMPolicy
-from icl_controller_transfer.policies.convnet_policy import GaussianCNNPolicy, CNN
+from controller_transfer.policies import GCConvPolicy, ACTPolicy, GNMPolicy
+from controller_transfer.policies.convnet_policy import GaussianCNNPolicy, CNN
 
 def make_policy(policy_class, policy_config):
     if policy_class == 'ACT':
@@ -53,8 +53,8 @@ with open(policy_config_path, 'rb') as f:
     policy_config = yaml.safe_load(f)
 policy_class = 'ConvNet'
 policy = make_policy(policy_class, policy_config)
-checkpoint_path = '/iris/u/jyang27/dev/icl_controller_transfer/scripts/checkpoints/23-09-05-ConvNet-icl_controller_transfer-seed-2/policy_epoch_1900_seed_2.ckpt' 
-#checkpoint_path = '/iris/u/jyang27/dev/icl_controller_transfer/scripts/checkpoints/23-09-06-ConvNet-icl_controller_transfer-seed-0/policy_epoch_1400_seed_0.ckpt'
+checkpoint_path = '/iris/u/jyang27/dev/controller_transfer/scripts/checkpoints/23-09-05-ConvNet-controller_transfer-seed-2/policy_epoch_1900_seed_2.ckpt' 
+#checkpoint_path = '/iris/u/jyang27/dev/controller_transfer/scripts/checkpoints/23-09-06-ConvNet-controller_transfer-seed-0/policy_epoch_1400_seed_0.ckpt'
 with open(checkpoint_path, 'rb') as f:
     policy.load_state_dict(torch.load(f))
 policy = policy.cuda()
