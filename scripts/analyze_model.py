@@ -2,17 +2,17 @@ import torch
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from functools import partial
-from omnimimic.data.rlds_data_transforms import RLDS_TRANSFORM_DICT
-from omnimimic.data.dataset import *
-from omnimimic.data.data_splits import DATASET_SPLITS
-from omnimimic.policies import *
-import omnimimic.torch.pytorch_util as ptu
+from icl_controller_transfer.data.rlds_data_transforms import RLDS_TRANSFORM_DICT
+from icl_controller_transfer.data.dataset import *
+from icl_controller_transfer.data.data_splits import DATASET_SPLITS
+from icl_controller_transfer.policies import *
+import icl_controller_transfer.torch.pytorch_util as ptu
 import yaml
 import matplotlib.pyplot as plt
 
-POLICY_CONFIG_PATH = '/iris/u/jyang27/dev/omnimimic/policy_config/gnmv9_policy_single.yaml'
-POLICY_CHECKPOINT = '/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-03-GNM-omnimimic-seed-70_53-23-29/policy_epoch_30_seed_70.ckpt' 
-POLICY_CHECKPOINT = "/iris/u/jyang27/dev/omnimimic/scripts/checkpoints/23-11-08-GNM-omnimimic-seed-70_48-6-20/policy_epoch_5_seed_70.ckpt" 
+POLICY_CONFIG_PATH = '/iris/u/jyang27/dev/icl_controller_transfer/policy_config/gnmv9_policy_single.yaml'
+POLICY_CHECKPOINT = '/iris/u/jyang27/dev/icl_controller_transfer/scripts/checkpoints/23-11-03-GNM-icl_controller_transfer-seed-70_53-23-29/policy_epoch_30_seed_70.ckpt' 
+POLICY_CHECKPOINT = "/iris/u/jyang27/dev/icl_controller_transfer/scripts/checkpoints/23-11-08-GNM-icl_controller_transfer-seed-70_48-6-20/policy_epoch_5_seed_70.ckpt" 
 
 def detach_dict(d):
     new_d = dict()

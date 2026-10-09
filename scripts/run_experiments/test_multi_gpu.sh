@@ -9,10 +9,10 @@
 #SBATCH --cpus-per-task=12
 #SBATCH --gres=gpu:A5000:8
 #SBATCH --job-name="cglossop_omni"
-#SBATCH --output=/global/scratch/users/catherineglossop/omnimimic/outputs/exp-%j.out
+#SBATCH --output=/global/scratch/users/catherineglossop/icl_controller_transfer/outputs/exp-%j.out
 
 source ~/.bashrc
-cd /global/home/users/catherineglossop/omnimimic/scripts
+cd /global/home/users/catherineglossop/icl_controller_transfer/scripts
 conda activate /global/scratch/users/catherineglossop/miniconda3/omni
 # module load cuda/12.2
 # export LD_PRELOAD=/global/software/sl-7.x86_64/modules/cuda/11.4/cudnn/8.7.0/lib64/libcudnn.so

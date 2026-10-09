@@ -9,7 +9,7 @@ from torchvision.transforms import ColorJitter
 import torch.nn.functional as F
 from torch.distributions import constraints, Distribution, Independent, Normal
 import numpy as np
-import omnimimic.torch.pytorch_util as ptu
+import icl_controller_transfer.torch.pytorch_util as ptu
 
 class CNN(nn.Module):
     # TODO: remove the FC parts of this code

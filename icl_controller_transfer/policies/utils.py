@@ -1,5 +1,5 @@
 import torch
-import omnimimic.torch.pytorch_util as ptu
+import icl_controller_transfer.torch.pytorch_util as ptu
 from torchvision.transforms import ColorJitter
 
 def get_augmentation_transforms(augmentation_types, augmentation_config):

@@ -12,8 +12,8 @@ from datetime import datetime
 import yaml
 import pickle as pkl
 
-from omnimimic.policies import *
-import omnimimic.torch.pytorch_util as ptu
+from icl_controller_transfer.policies import *
+import icl_controller_transfer.torch.pytorch_util as ptu
 
 class max_q_policy:
     def __init__(self, qf1, policy, use_robot_state=True, num_repeat=100):

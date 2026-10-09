@@ -18,12 +18,12 @@ from datetime import datetime
 from typing import Any, Dict
 from functools import partial
 
-from omnimimic.policies import *
-from omnimimic.data.dataset import *
-from omnimimic.data.data_splits import DATASET_SPLITS, VERSION_DICT
-from omnimimic.train_utils.visualize_utils import (visualize_obs_action,
+from icl_controller_transfer.policies import *
+from icl_controller_transfer.data.dataset import *
+from icl_controller_transfer.data.data_splits import DATASET_SPLITS, VERSION_DICT
+from icl_controller_transfer.train_utils.visualize_utils import (visualize_obs_action,
     visualize_action_dist, visualize_goal_reaching_plots)
-import omnimimic.torch.pytorch_util as ptu
+import icl_controller_transfer.torch.pytorch_util as ptu
 
 from prettytable import PrettyTable
 import wandb
@@ -57,7 +57,7 @@ def main(args):
     val_datasets = args['val_datasets']
     seed = args['seed']  
     gpu_ids = args['gpu_ids'] 
-    exp_name = '{}-{}-omnimimic-seed-{}'.format(time.strftime("%y-%m-%d"), policy_class, seed)
+    exp_name = '{}-{}-icl_controller_transfer-seed-{}'.format(time.strftime("%y-%m-%d"), policy_class, seed)
 
     #Load Policy Config and Policy
     with open(policy_config_path, 'rb') as f:
@@ -180,7 +180,7 @@ def main(args):
     }
 
     #Set up logger
-    run_name = f'omnimimic_train-{policy_class}-'
+    run_name = f'icl_controller_transfer_train-{policy_class}-'
     run_name = run_name + '_'.join(datasets)
     logger = wandb.init(
         name=run_name,
